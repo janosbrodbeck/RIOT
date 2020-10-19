@@ -27,6 +27,9 @@
 #define ENABLE_DEBUG            (0)
 #include "debug.h"
 #define ADV_INSTANCES           (MYNEWT_VAL_BLE_MULTI_ADV_INSTANCES+1)
+#define L2_ADDR_LEN             (6)
+#define VENDOR_ID_1             (0xFE)
+#define VENDOR_ID_2             (0xED)
 
 typedef enum {
     STOPPED = 0,
@@ -36,8 +39,9 @@ typedef enum {
 
 static int _configure_adv_instance(uint8_t instance);
 static int _gap_event(struct ble_gap_event *event, void *arg);
-static int _prepare_mbuf(gnrc_pktsnip_t *pkt, struct os_mbuf *mbuf);
+static int _prepare_mbuf(gnrc_pktsnip_t *pkt, gnrc_netif_hdr_t *hdr, struct os_mbuf *mbuf);
 static int _send_pkt(gnrc_pktsnip_t *pkt, uint8_t instance);
+static size_t _prepare_hdr_in_buf(uint8_t *buf, gnrc_netif_hdr_t *hdr, bool zfirst);
 
 mutex_t _instance_status_lock;
 static _adv_instance_status_t _instance_status[ADV_INSTANCES];
@@ -50,19 +54,121 @@ int jelling_send(gnrc_pktsnip_t* pkt) {
         return -1;
     }
 
+    /* allocate mbuf */
     struct os_mbuf *buf = os_msys_get_pkthdr(JELLING_MTU+JELLING_HDR_RESERVED, 0);
     if(buf == NULL) {
         return -ENOBUFS;
     }
 
-    int res;
-    _send_pkt(pkt, 0);
+    /* get netif_hdr */
+    gnrc_netif_hdr_t *hdr = (gnrc_netif_hdr_t *)pkt->data;
+
+    int res = _prepare_mbuf(pkt, hdr, buf);
+    if (res != 0) {
+        printf("jelling_send: mbuf_append failed. Return code: %d\n", res);
+        os_mbuf_free_chain(buf);
+        return -1;
+    }
+
+    os_mbuf_free_chain(buf);
     return 0;
 }
 
-static int _prepare_mbuf(gnrc_pktsnip_t *pkt, struct os_mbuf *mbuf)
+static int _prepare_mbuf(gnrc_pktsnip_t *pkt, gnrc_netif_hdr_t *hdr, struct os_mbuf *mbuf)
 {
-    return 0;
+    size_t buf_len = 0;
+    /* helper buffer */
+    uint8_t buf[JELLING_MTU+JELLING_HDR_RESERVED];
+    const uint8_t MAX_SIZE = JELLING_MTU > 255 ? 255 : JELLING_MTU;
+
+    /* written bytes in the curr fragment */
+    uint8_t len_written = 0;
+
+    /* pos_buf := position in buffer; pos_len := length field of current fragment */
+    uint8_t *pos_buf, *pos_len;
+    pos_len = buf;
+
+    /* write first fragment with dst l2 address */
+    len_written += _prepare_hdr_in_buf(buf, hdr, true);
+    pos_buf = buf + len_written;
+
+    /* drop first snippet. We only used it to determine the dst address */
+    pkt = pkt->next;
+
+    while (pkt) {
+        uint8_t len_curr_pkt = pkt->size;
+        /* offset for position in the current gnrc_pktsnip */
+        uint8_t pkt_offset = 0;
+        while(len_curr_pkt != 0) {
+            if (len_curr_pkt <= MAX_SIZE-len_written) {
+                /* we fit in the current fragment */
+                memcpy(pos_buf, pkt->data+pkt_offset, len_curr_pkt);
+                pos_buf += len_curr_pkt;
+                len_written += len_curr_pkt;
+                len_curr_pkt = 0;
+            } else { /* we don't fit */
+                uint8_t to_write = MAX_SIZE-len_written;
+                memcpy(pos_buf, pkt->data+pkt_offset, to_write);
+                pkt_offset += to_write;
+                pos_buf += to_write;
+                len_written += to_write;
+                len_curr_pkt -= to_write;
+            }
+
+            /* fragment is full */
+            if (len_written == MAX_SIZE)
+            {
+                /* write len field, -1 because the length field does not count */
+                memset(pos_len, MAX_SIZE-1, 1);
+                pos_len = pos_buf;
+                pos_buf += 1;
+                buf_len += len_written;
+
+                /* there is more data */
+                if (len_curr_pkt != 0 || pkt->next != NULL) {
+                    /* write new header in next fragment */
+                    len_written = _prepare_hdr_in_buf(buf, hdr, false);
+                    pos_buf += len_written;
+                }
+            }
+        }
+        pkt = pkt->next;
+    }
+    /* started fragment left */
+    if (len_written != 0) {
+        /* write len field, -1 because the length field does not count */
+        memset(pos_len, len_written-1, 1);
+        buf_len += len_written;
+    }
+
+    /* copy helper buffer into mbuf */
+    int res = os_mbuf_append(mbuf, buf, buf_len);
+    return res;
+}
+
+static size_t _prepare_hdr_in_buf(uint8_t *buf, gnrc_netif_hdr_t *hdr, bool first) {
+    /* one because of the reserved len field */
+    size_t len = 1;
+
+     /* data type: manufacturer specific data */
+    memset(buf+len, BLE_GAP_AD_VENDOR, 1);
+    /* 2 octet company identifier code */
+    memset(buf+len+1, VENDOR_ID_1, 1);
+    memset(buf+len+2, VENDOR_ID_2, 1);
+    len += 3;
+    if (first) {
+        if (hdr->flags & GNRC_NETIF_HDR_FLAGS_MULTICAST) {
+            memset(buf+len, 0xff, 1);
+            memset(buf+len+1, 0, L2_ADDR_LEN-1);
+        }
+        else { /* unicast */
+            /* insert destination l2 address */
+            uint8_t *dst_addr = gnrc_netif_hdr_get_dst_addr(hdr);
+            memcpy(buf+len, dst_addr, L2_ADDR_LEN);
+        }
+        len += L2_ADDR_LEN;
+    }
+    return len;
 }
 
 static int _send_pkt(gnrc_pktsnip_t *pkt, uint8_t instance)
@@ -165,6 +271,7 @@ void jelling_start(void)
         _instance_status[i] = IDLE;
     }
     mutex_unlock(&_instance_status_lock);
+    _jelling_status = JELLING_IDLE;
 }
 
 void jelling_stop(void)
