@@ -40,7 +40,7 @@ typedef enum {
 static int _configure_adv_instance(uint8_t instance);
 static int _gap_event(struct ble_gap_event *event, void *arg);
 static int _prepare_mbuf(gnrc_pktsnip_t *pkt, gnrc_netif_hdr_t *hdr, struct os_mbuf *mbuf);
-static int _send_pkt(gnrc_pktsnip_t *pkt, uint8_t instance);
+static int _send_pkt(struct os_mbuf *mbuf);
 static size_t _prepare_hdr_in_buf(uint8_t *buf, gnrc_netif_hdr_t *hdr, bool zfirst);
 
 mutex_t _instance_status_lock;
@@ -69,7 +69,7 @@ int jelling_send(gnrc_pktsnip_t* pkt) {
         os_mbuf_free_chain(buf);
         return -1;
     }
-
+    _send_pkt(buf);
     os_mbuf_free_chain(buf);
     return 0;
 }
@@ -171,30 +171,38 @@ static size_t _prepare_hdr_in_buf(uint8_t *buf, gnrc_netif_hdr_t *hdr, bool firs
     return len;
 }
 
-static int _send_pkt(gnrc_pktsnip_t *pkt, uint8_t instance)
+static int _send_pkt(struct os_mbuf *mbuf)
 {
-    size_t data_len = gnrc_pkt_len(pkt);
     int res;
-    int max_events = 0;
+    uint8_t instance = -1;
 
-   /*  if(_fragment(pkt, data_mbuf) != 0) {
-        printf("could not fragment packets: %d\n", data_mbuf->om_len);
+    /* find free advertising instace */
+    mutex_lock(&_instance_status_lock);
+    for (int i = 0; i < ADV_INSTANCES; i++) {
+        if (_instance_status[i] == IDLE) {
+            _instance_status[i] = ADVERTISING;
+            instance = i;
+            break;
+        }
+    }
+    mutex_unlock(&_instance_status_lock);
+
+    if (instance == -1) {
         return -1;
-    } */
+    }
 
-    /* res = ble_gap_ext_adv_set_data(instance, data_mbuf);
+    res = ble_gap_ext_adv_set_data(instance, mbuf);
     if (res) {
         printf("Could not set advertising data: 0x%02X\n", res);
         return res;
     }
 
-    res = ble_gap_ext_adv_start(instance, 0, max_events);
+    res = ble_gap_ext_adv_start(instance, JELLING_ADVERTISING_DURATION,
+                            JELLING_ADVERTISING_EVENTS);
     if (res) {
         printf("Couldn't start advertising. Return code: 0x%02X\n", res);
         return -1;
     }
-    printf("advertising started!\n");
-    _jelling_status = JELLING_ADVERTISING; */
     return res;
 }
 
