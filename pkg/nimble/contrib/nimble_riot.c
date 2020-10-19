@@ -132,6 +132,11 @@ void nimble_riot_init(void)
 #endif
 #endif
 
+#ifdef MODULE_NIMBLE_JELLING
+    extern void jelling_netif_init(void);
+    jelling_netif_init();
+#endif
+
     /* initialize the configured, built-in services */
 #ifdef MODULE_NIMBLE_SVC_GAP
     ble_svc_gap_init();
