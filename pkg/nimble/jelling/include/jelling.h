@@ -19,6 +19,30 @@
 #define JELLING_ADVERTISING_DURATION        (500)
 #endif
 
+#ifndef JELLING_SCANNER_ITVL
+#define JELLING_SCANNER_ITVL                (BLE_GAP_SCAN_FAST_INTERVAL_MIN)
+#endif
+
+#ifndef JELLING_SCANNER_WINDOW
+#define JELLING_SCANNER_WINDOW              (BLE_GAP_SCAN_FAST_WINDOW)
+#endif
+
+#ifndef JELLING_SCANNER_DURATION
+#define JELLING_SCANNER_DURATION            (0)
+#endif
+
+#ifndef JELLING_SCANNER_PERIOD
+#define JELLING_SCANNER_PERIOD              (0)
+#endif
+
+#ifndef JELLING_SCANNER_WAIT_TILL_NEXT
+#define JELLING_SCANNER_WAIT_TILL_NEXT      (150)
+#endif
+
+#ifndef JELLING_SCANNER_ENABLE
+#define JELLING_SCANNER_ENABLE              (1)
+#endif
+
 /**
  * @brief   Status types of the NimBLE jelling module
  */
@@ -26,9 +50,7 @@ typedef enum {
     JELLING_INIT_ERROR = -2,
     JELLING_RUNTIME_ERROR = -1,
     JELLING_STOPPED = 0,         /**< network connector is stopped */
-    JELLING_IDLE,                /**< network connector is idle  */
-    JELLING_ADVERTISING,         /**< network connector is scanning */
-    JELLING_SCANNING             /**< network connector is advertising */
+    JELLING_RUNNING = 1
 } jelling_status_t;
 
 int jelling_init(void);

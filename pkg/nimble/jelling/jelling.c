@@ -41,7 +41,10 @@ static int _configure_adv_instance(uint8_t instance);
 static int _gap_event(struct ble_gap_event *event, void *arg);
 static int _prepare_mbuf(gnrc_pktsnip_t *pkt, gnrc_netif_hdr_t *hdr, struct os_mbuf *mbuf);
 static int _send_pkt(struct os_mbuf *mbuf);
-static size_t _prepare_hdr_in_buf(uint8_t *buf, gnrc_netif_hdr_t *hdr, bool zfirst);
+static size_t _prepare_hdr_in_buf(uint8_t *buf, gnrc_netif_hdr_t *hdr, bool first);
+static int _start_scanner(void);
+static void _on_data(struct ble_gap_event *event, void *arg);
+static void _scan_complete(void);
 
 mutex_t _instance_status_lock;
 static _adv_instance_status_t _instance_status[ADV_INSTANCES];
@@ -206,22 +209,83 @@ static int _send_pkt(struct os_mbuf *mbuf)
     return res;
 }
 
+static int _start_scanner(void) {
+    struct ble_gap_ext_disc_params uncoded = {0};
+    uint8_t limited = 0;
+    uint8_t filter_duplicates = 1;
+    uint16_t duration = JELLING_SCANNER_DURATION;
+    uint16_t period = JELLING_SCANNER_PERIOD;
+
+    /* Set uncoded parameters */
+    uncoded.passive = 1;
+    uncoded.itvl = JELLING_SCANNER_ITVL;
+    uncoded.window = JELLING_SCANNER_WINDOW;
+
+    /* start scan */
+    int rc = ble_gap_ext_disc(nimble_riot_own_addr_type, duration, period, filter_duplicates,
+                            BLE_HCI_SCAN_FILT_NO_WL, limited, &uncoded, NULL, _gap_event, NULL);
+    if(rc != 0) {
+        printf("_start_scanner failed. Return code %02X\n", rc);
+    }
+    return rc;
+}
+
 static int _gap_event(struct ble_gap_event *event, void *arg)
 {
     (void) arg;
 
     switch(event->type) {
         case BLE_GAP_EVENT_ADV_COMPLETE:
-            printf("advertise complete; reason=%d, instance=%u, handle=%d\n",
+            DEBUG("advertise complete; reason=%d, instance=%u, handle=%d\n",
                        event->adv_complete.reason, event->adv_complete.instance,
                        event->adv_complete.conn_handle);
             mutex_lock(&_instance_status_lock);
             _instance_status[event->adv_complete.instance] = IDLE;
             mutex_unlock(&_instance_status_lock);
             return 0;
+        case BLE_GAP_EVENT_EXT_DISC:
+            _on_data(event, arg);
+            return 0;
+        case BLE_GAP_EVENT_DISC_COMPLETE:
+            printf("BLE_GAP_EVENT_DISC_COMPLETE\n");
+            _scan_complete();
+            return 0;
+
     }
-    printf("No registerd event occured!\n");
     return 0;
+}
+
+inline static void print_addr(const void *addr)
+{
+    const uint8_t *u8p = addr;
+    printf("%02x:%02x:%02x:%02x:%02x:%02x",
+                   u8p[5], u8p[4], u8p[3], u8p[2], u8p[1], u8p[0]);
+}
+
+static void _on_data(struct ble_gap_event *event, void *arg)
+{
+    printf("Packet found. Address: ");
+    print_addr(&event->ext_disc.addr);
+    printf("Data Length: %d bytes   ", event->ext_disc.length_data);
+    switch(event->ext_disc.data_status){
+        case BLE_GAP_EXT_ADV_DATA_STATUS_COMPLETE:
+            printf("COMPLETE\n");
+            break;
+        case BLE_GAP_EXT_ADV_DATA_STATUS_INCOMPLETE:
+            printf("INCOMPLETE\n");
+            break;
+        case BLE_GAP_EXT_ADV_DATA_STATUS_TRUNCATED:
+            printf("TRUNCATED\n");
+            break;
+    }
+}
+
+static void _filter_manufacturer_id(uint8_t *data, uint8_t len) {
+
+}
+
+static void _scan_complete(void) {
+
 }
 
 static int _configure_adv_instance(uint8_t instance) {
@@ -279,7 +343,10 @@ void jelling_start(void)
         _instance_status[i] = IDLE;
     }
     mutex_unlock(&_instance_status_lock);
-    _jelling_status = JELLING_IDLE;
+#ifdef JELLING_SCANNER_ENABLE
+    _start_scanner();
+#endif
+    _jelling_status = JELLING_RUNNING;
 }
 
 void jelling_stop(void)
@@ -339,17 +406,11 @@ void jelling_print_info(void)
         case JELLING_RUNTIME_ERROR:
             printf("RUNTIME ERROR\n");
             break;
-        case JELLING_IDLE:
-            printf("IDLE\n");
-            break;
         case JELLING_STOPPED:
             printf("STOPPED\n");
             break;
-        case JELLING_ADVERTISING:
-            printf("ADVERTISING\n");
-            break;
-        case JELLING_SCANNING:
-            printf("SCANNING\n");
+        case JELLING_RUNNING:
+            printf("RUNNING\n");
             break;
     }
     for(int i=0; i < ADV_INSTANCES; i++) {
