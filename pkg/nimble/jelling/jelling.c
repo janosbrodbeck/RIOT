@@ -72,7 +72,9 @@ int jelling_send(gnrc_pktsnip_t* pkt) {
         os_mbuf_free_chain(buf);
         return -1;
     }
+#if JELLING_ADVERTISER_ENABLE
     _send_pkt(buf);
+#endif
     os_mbuf_free_chain(buf);
     return 0;
 }
@@ -236,9 +238,11 @@ static int _gap_event(struct ble_gap_event *event, void *arg)
 
     switch(event->type) {
         case BLE_GAP_EVENT_ADV_COMPLETE:
-            DEBUG("advertise complete; reason=%d, instance=%u, handle=%d\n",
+#if JELLING_ADVERTISER_VERBOSE
+            printf("advertise complete; reason=%d, instance=%u, handle=%d\n",
                        event->adv_complete.reason, event->adv_complete.instance,
                        event->adv_complete.conn_handle);
+#endif
             mutex_lock(&_instance_status_lock);
             _instance_status[event->adv_complete.instance] = IDLE;
             mutex_unlock(&_instance_status_lock);
@@ -264,6 +268,7 @@ inline static void print_addr(const void *addr)
 
 static void _on_data(struct ble_gap_event *event, void *arg)
 {
+#if JELLING_SCANNER_VERBOSE
     printf("Packet found. Address: ");
     print_addr(&event->ext_disc.addr);
     printf("Data Length: %d bytes   ", event->ext_disc.length_data);
@@ -278,6 +283,7 @@ static void _on_data(struct ble_gap_event *event, void *arg)
             printf("TRUNCATED\n");
             break;
     }
+#endif
 }
 
 static void _filter_manufacturer_id(uint8_t *data, uint8_t len) {
@@ -343,7 +349,7 @@ void jelling_start(void)
         _instance_status[i] = IDLE;
     }
     mutex_unlock(&_instance_status_lock);
-#ifdef JELLING_SCANNER_ENABLE
+#if JELLING_SCANNER_ENABLE
     _start_scanner();
 #endif
     _jelling_status = JELLING_RUNNING;

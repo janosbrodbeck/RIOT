@@ -1,5 +1,13 @@
 #include "net/gnrc/pktbuf.h"
 
+#ifndef JELLING_ADVERTISER_ENABLE
+#define JELLING_ADVERTISER_ENABLE           (1)
+#endif
+
+#ifndef JELLING_ADVERTISER_VERBOSE
+#define JELLING_ADVERTISER_VERBOSE          (0)
+#endif
+
 /**
  * @brief   Number of advertising events that should be sent
  *          before advertising ends and
@@ -17,6 +25,14 @@
  */
 #ifndef JELLING_ADVERTISING_DURATION
 #define JELLING_ADVERTISING_DURATION        (500)
+#endif
+
+#ifndef JELLING_SCANNER_ENABLE
+#define JELLING_SCANNER_ENABLE              (1)
+#endif
+
+#ifndef JELLING_SCANNER_VERBOSE
+#define JELLING_SCANNER_VERBOSE             (0)
 #endif
 
 #ifndef JELLING_SCANNER_ITVL
@@ -37,10 +53,6 @@
 
 #ifndef JELLING_SCANNER_WAIT_TILL_NEXT
 #define JELLING_SCANNER_WAIT_TILL_NEXT      (150)
-#endif
-
-#ifndef JELLING_SCANNER_ENABLE
-#define JELLING_SCANNER_ENABLE              (1)
 #endif
 
 /**
