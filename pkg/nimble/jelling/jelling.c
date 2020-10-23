@@ -50,6 +50,7 @@ mutex_t _instance_status_lock;
 static _adv_instance_status_t _instance_status[ADV_INSTANCES];
 static jelling_status_t _jelling_status;
 
+uint8_t _ble_addr[L2_ADDR_LEN];
 
 int jelling_send(gnrc_pktsnip_t* pkt) {
     /* jelling stopped or error appeared */
@@ -386,6 +387,13 @@ int jelling_init(void)
         }
         _instance_status[i] = STOPPED;
     }
+
+    /* workaround: save L2 ble random addr */
+    uint8_t own_addr[BLE_ADDR_LEN];
+    uint8_t tmp_addr[BLE_ADDR_LEN];
+    ble_hs_id_copy_addr(nimble_riot_own_addr_type, tmp_addr, NULL);
+    bluetil_addr_swapped_cp(tmp_addr, _ble_addr);
+
     return 0;
 }
 
@@ -396,10 +404,10 @@ void jelling_print_info(void)
     ble_hs_id_copy_addr(nimble_riot_own_addr_type, tmp_addr, NULL);
     bluetil_addr_swapped_cp(tmp_addr, own_addr);
     printf("Own Address: ");
-    bluetil_addr_print(own_addr);
+    bluetil_addr_print(_ble_addr);
     #ifdef MODULE_GNRC_IPV6
         printf(" -> ");
-        bluetil_addr_ipv6_l2ll_print(own_addr);
+        bluetil_addr_ipv6_l2ll_print(_ble_addr);
     #endif
     puts("");
     printf("Advertising instances: %d\n", ADV_INSTANCES);
