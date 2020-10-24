@@ -1,12 +1,5 @@
 #include "net/gnrc/pktbuf.h"
-
-#ifndef JELLING_ADVERTISER_ENABLE
-#define JELLING_ADVERTISER_ENABLE           (1)
-#endif
-
-#ifndef JELLING_ADVERTISER_VERBOSE
-#define JELLING_ADVERTISER_VERBOSE          (0)
-#endif
+#include "net/ble.h"
 
 /**
  * @brief   Number of advertising events that should be sent
@@ -25,14 +18,6 @@
  */
 #ifndef JELLING_ADVERTISING_DURATION
 #define JELLING_ADVERTISING_DURATION        (500)
-#endif
-
-#ifndef JELLING_SCANNER_ENABLE
-#define JELLING_SCANNER_ENABLE              (1)
-#endif
-
-#ifndef JELLING_SCANNER_VERBOSE
-#define JELLING_SCANNER_VERBOSE             (0)
 #endif
 
 #ifndef JELLING_SCANNER_ITVL
@@ -55,6 +40,10 @@
 #define JELLING_SCANNER_WAIT_TILL_NEXT      (150)
 #endif
 
+#ifndef JELLING_SCANNER_FILTER_SIZE
+#define JELLING_SCANNER_FILTER_SIZE         (3)
+#endif
+
 /**
  * @brief   Status types of the NimBLE jelling module
  */
@@ -65,8 +54,31 @@ typedef enum {
     JELLING_RUNNING = 1
 } jelling_status_t;
 
+typedef struct {
+    uint8_t addr[BLE_ADDR_LEN];
+    bool empty;
+} filter_entry_t;
+
+typedef struct {
+    bool advertiser_enable;
+    bool advertiser_verbose;
+    bool advertiser_block_icmp;
+    bool scanner_enable;
+    bool scanner_verbose;
+    bool scanner_filter_empty;
+    filter_entry_t scanner_filter[JELLING_SCANNER_FILTER_SIZE];
+} jelling_config_t;
+
 int jelling_init(void);
 void jelling_start(void);
 void jelling_stop(void);
+
 int jelling_send(gnrc_pktsnip_t *pkt);
+
+void jelling_load_default_config(void);
+jelling_config_t* jelling_get_config(void);
+int jelling_filter_add(char *addr);
+void jelling_filter_clear(void);
+
+void jelling_print_config(void);
 void jelling_print_info(void);

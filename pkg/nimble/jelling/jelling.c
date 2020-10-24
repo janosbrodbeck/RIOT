@@ -27,7 +27,6 @@
 #define ENABLE_DEBUG            (0)
 #include "debug.h"
 #define ADV_INSTANCES           (MYNEWT_VAL_BLE_MULTI_ADV_INSTANCES+1)
-#define L2_ADDR_LEN             (6)
 #define VENDOR_ID_1             (0xFE)
 #define VENDOR_ID_2             (0xED)
 
@@ -37,45 +36,62 @@ typedef enum {
     ADVERTISING = 2
 } _adv_instance_status_t;
 
-static int _configure_adv_instance(uint8_t instance);
-static int _gap_event(struct ble_gap_event *event, void *arg);
-static int _prepare_mbuf(gnrc_pktsnip_t *pkt, gnrc_netif_hdr_t *hdr, struct os_mbuf *mbuf);
 static int _send_pkt(struct os_mbuf *mbuf);
-static size_t _prepare_hdr_in_buf(uint8_t *buf, gnrc_netif_hdr_t *hdr, bool first);
 static int _start_scanner(void);
-static void _on_data(struct ble_gap_event *event, void *arg);
+static int _gap_event(struct ble_gap_event *event, void *arg);
 static void _scan_complete(void);
+static void _on_data(struct ble_gap_event *event, void *arg);
+static int _prepare_mbuf(gnrc_pktsnip_t *pkt, gnrc_netif_hdr_t *hdr, struct os_mbuf *mbuf);
+static size_t _prepare_hdr_in_buf(uint8_t *buf, gnrc_netif_hdr_t *hdr, bool first);
+static int _configure_adv_instance(uint8_t instance);
 
-mutex_t _instance_status_lock;
+static mutex_t _instance_status_lock;
 static _adv_instance_status_t _instance_status[ADV_INSTANCES];
 static jelling_status_t _jelling_status;
+static jelling_config_t _config;
 
-uint8_t _ble_addr[L2_ADDR_LEN];
+static uint8_t _ble_addr[BLE_ADDR_LEN];
 
 int jelling_send(gnrc_pktsnip_t* pkt) {
     /* jelling stopped or error appeared */
     if (_jelling_status <= 0) {
         return -1;
     }
+    if (!_config.advertiser_enable) {
+        return 0;
+    }
+
+    /* if configured: don't send ICMP messages */
+    if (_config.advertiser_block_icmp) {
+        gnrc_pktsnip_t *tmp = pkt;
+        while (tmp) {
+            if (tmp-> type == GNRC_NETTYPE_ICMPV6) {
+                printf("Skipped ICMP\n");
+                return 0;
+            }
+            tmp = tmp->next;
+        }
+    }
 
     /* allocate mbuf */
     struct os_mbuf *buf = os_msys_get_pkthdr(JELLING_MTU+JELLING_HDR_RESERVED, 0);
-    if(buf == NULL) {
+    if (buf == NULL) {
         return -ENOBUFS;
     }
 
     /* get netif_hdr */
     gnrc_netif_hdr_t *hdr = (gnrc_netif_hdr_t *)pkt->data;
 
+    /* fragment data for NimBLE/BLE and write it directly into the mbuf */
     int res = _prepare_mbuf(pkt, hdr, buf);
     if (res != 0) {
         printf("jelling_send: mbuf_append failed. Return code: %d\n", res);
         os_mbuf_free_chain(buf);
         return -1;
     }
-#if JELLING_ADVERTISER_ENABLE
+
     _send_pkt(buf);
-#endif
+
     os_mbuf_free_chain(buf);
     return 0;
 }
@@ -165,14 +181,14 @@ static size_t _prepare_hdr_in_buf(uint8_t *buf, gnrc_netif_hdr_t *hdr, bool firs
     if (first) {
         if (hdr->flags & GNRC_NETIF_HDR_FLAGS_MULTICAST) {
             memset(buf+len, 0xff, 1);
-            memset(buf+len+1, 0, L2_ADDR_LEN-1);
+            memset(buf+len+1, 0, BLE_ADDR_LEN-1);
         }
         else { /* unicast */
             /* insert destination l2 address */
             uint8_t *dst_addr = gnrc_netif_hdr_get_dst_addr(hdr);
-            memcpy(buf+len, dst_addr, L2_ADDR_LEN);
+            memcpy(buf+len, dst_addr, BLE_ADDR_LEN);
         }
-        len += L2_ADDR_LEN;
+        len += BLE_ADDR_LEN;
     }
     return len;
 }
@@ -239,11 +255,11 @@ static int _gap_event(struct ble_gap_event *event, void *arg)
 
     switch(event->type) {
         case BLE_GAP_EVENT_ADV_COMPLETE:
-#if JELLING_ADVERTISER_VERBOSE
-            printf("advertise complete; reason=%d, instance=%u, handle=%d\n",
-                       event->adv_complete.reason, event->adv_complete.instance,
-                       event->adv_complete.conn_handle);
-#endif
+            if(_config.advertiser_verbose) {
+                printf("advertise complete; reason=%d, instance=%u, handle=%d\n",
+                        event->adv_complete.reason, event->adv_complete.instance,
+                        event->adv_complete.conn_handle);
+            }
             mutex_lock(&_instance_status_lock);
             _instance_status[event->adv_complete.instance] = IDLE;
             mutex_unlock(&_instance_status_lock);
@@ -269,22 +285,39 @@ inline static void print_addr(const void *addr)
 
 static void _on_data(struct ble_gap_event *event, void *arg)
 {
-#if JELLING_SCANNER_VERBOSE
-    printf("Packet found. Address: ");
-    print_addr(&event->ext_disc.addr);
-    printf("Data Length: %d bytes   ", event->ext_disc.length_data);
-    switch(event->ext_disc.data_status){
-        case BLE_GAP_EXT_ADV_DATA_STATUS_COMPLETE:
-            printf("COMPLETE\n");
-            break;
-        case BLE_GAP_EXT_ADV_DATA_STATUS_INCOMPLETE:
-            printf("INCOMPLETE\n");
-            break;
-        case BLE_GAP_EXT_ADV_DATA_STATUS_TRUNCATED:
-            printf("TRUNCATED\n");
-            break;
+    /* if we have sth in our filter list */
+    if (!_config.scanner_filter_empty) {
+        bool match = false;
+        for (int i = 0; i < JELLING_SCANNER_FILTER_SIZE; i++) {
+            if (!_config.scanner_filter[i].empty) {
+                if (memcmp(_config.scanner_filter[i].addr,
+                        event->ext_disc.addr.val, 6) == 0) {
+                    match = true;
+                    break;
+                }
+            }
+        }
+        if (!match) {
+            return;
+        }
     }
-#endif
+
+    if(_config.scanner_verbose) {
+        printf("Address: ");
+        bluetil_addr_print(event->ext_disc.addr.val);
+        printf("    Data Length: %d bytes:    ", event->ext_disc.length_data);
+        switch(event->ext_disc.data_status) {
+            case BLE_GAP_EXT_ADV_DATA_STATUS_COMPLETE:
+                printf("COMPLETE\n");
+                break;
+            case BLE_GAP_EXT_ADV_DATA_STATUS_INCOMPLETE:
+                printf("INCOMPLETE\n");
+                break;
+            case BLE_GAP_EXT_ADV_DATA_STATUS_TRUNCATED:
+                printf("TRUNCATED\n");
+                break;
+        }
+    }
 }
 
 static void _filter_manufacturer_id(uint8_t *data, uint8_t len) {
@@ -350,9 +383,10 @@ void jelling_start(void)
         _instance_status[i] = IDLE;
     }
     mutex_unlock(&_instance_status_lock);
-#if JELLING_SCANNER_ENABLE
-    _start_scanner();
-#endif
+
+    if(_config.scanner_enable) {
+        _start_scanner();
+    }
     _jelling_status = JELLING_RUNNING;
 }
 
@@ -376,6 +410,7 @@ void jelling_stop(void)
 int jelling_init(void)
 {
     _jelling_status = JELLING_STOPPED;
+    jelling_load_default_config();
     mutex_init(&_instance_status_lock);
 
     int res;
@@ -440,5 +475,94 @@ void jelling_print_info(void)
                 printf("ADVERTISING\n");
                 break;
         }
+    }
+}
+
+int jelling_filter_add(char *addr)
+{
+    int pos = -1;
+    /* find empty space in filter list */
+    for (int i = 0; i < JELLING_SCANNER_FILTER_SIZE; i++) {
+        if (_config.scanner_filter[i].empty) {
+            pos = i;
+            break;
+        }
+    }
+    if (pos == -1) {
+        return -1;
+    }
+
+    if (bluetil_addr_from_str(_config.scanner_filter[pos].addr, addr) == NULL) {
+        return -1;
+    }
+
+    /* swap address (ask hauke why our addr is represented swapped) */
+    uint8_t tmp[BLE_ADDR_LEN];
+    bluetil_addr_swapped_cp(_config.scanner_filter[pos].addr, tmp);
+    memcpy(_config.scanner_filter[pos].addr, tmp, BLE_ADDR_LEN);
+
+    _config.scanner_filter_empty = false;
+    _config.scanner_filter[pos].empty = false;
+    return 0;
+}
+
+void jelling_filter_clear(void)
+{
+    memcpy(_config.scanner_filter, 0, sizeof(_config.scanner_filter));
+    for (int i=0; i < JELLING_SCANNER_FILTER_SIZE; i++) {
+        _config.scanner_filter[i].empty = true;
+    }
+    _config.scanner_filter_empty = true;
+}
+
+void jelling_load_default_config(void)
+{
+    _config.advertiser_enable = true;
+    _config.advertiser_verbose = false;
+    _config.advertiser_block_icmp = false;
+    _config.scanner_enable = true;
+    _config.scanner_verbose = false;
+    memcpy(_config.scanner_filter, 0, sizeof(_config.scanner_filter));
+    for (int i=0; i < JELLING_SCANNER_FILTER_SIZE; i++) {
+        _config.scanner_filter[i].empty = true;
+    }
+    _config.scanner_filter_empty = true;
+}
+
+jelling_config_t *jelling_get_config(void) {
+    return &_config;
+}
+
+void jelling_print_config(void) {
+    printf("--- Jelling configuration  ---\n");
+
+    if (_config.advertiser_enable) {
+        printf("Advertiser: enabled\n");
+    } else { printf("Advertiser: disabled\n"); }
+    if (_config.advertiser_verbose) {
+        printf("Advertiser: verbose\n");
+    } else { printf("Advertiser: not verbose\n"); }
+    if (_config.advertiser_block_icmp) {
+        printf("Advertiser: ICMP packets blocked\n");
+    } else { printf("Advertiser: ICMP packets not blocked\n"); }
+
+
+    if (_config.scanner_enable) {
+        printf("Scanner: enabled\n");
+    } else { printf("Scanner: disabled\n"); }
+    if (_config.scanner_verbose) {
+        printf("Scanner: verbose\n");
+    } else { printf("Scanner: not verbose\n"); }
+    bool empty = true;
+    for (int i=0; i < JELLING_SCANNER_FILTER_SIZE; i++) {
+        if (!_config.scanner_filter[i].empty) {
+            printf("Filter: ");
+            bluetil_addr_print(_config.scanner_filter[i].addr);
+            puts("");
+            empty = false;
+        }
+    }
+    if (empty) {
+        printf("Scanner: no address in filter\n");
     }
 }
