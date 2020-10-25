@@ -50,7 +50,7 @@ int _nimble_jelling_handler(int argc, char **argv)
     }
     if (memcmp(argv[1], "config", 6) == 0) {
         if (argc == 2) {
-            printf("config usage: [info|default|icmp||filter {}|scanner blank/verbose|"
+            printf("config usage: [info|default|icmp||filter {ADDR}/clear|scanner blank/verbose|"
             "advertiser blank/verbose]\n");
             return 0;
         }

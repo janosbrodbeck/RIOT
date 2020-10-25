@@ -244,3 +244,7 @@ void jelling_netif_init(void)
                     "jelling_netif", &_nimble_netdev_dummy, &_nimble_netif_ops);
 
 }
+
+gnrc_nettype_t nimble_jelling_get_nettype(void) {
+    return _nettype;
+}

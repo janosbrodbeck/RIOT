@@ -48,6 +48,7 @@ extern "C" {
  * auto-init.
  */
 void nimble_jelling_init(void);
+gnrc_nettype_t nimble_jelling_get_nettype(void);
 
 #ifdef __cplusplus
 }

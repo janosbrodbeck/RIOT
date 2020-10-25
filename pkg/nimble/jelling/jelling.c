@@ -30,11 +30,26 @@
 #define VENDOR_ID_1             (0xFE)
 #define VENDOR_ID_2             (0xED)
 
+/* offset between data type (manufacturer specific data) and
+ * start of next hop address */
+#define PACKET_NEXT_HOP_OFFSET  (4)
+#define PACKET_DATA_OFFSET      (10)
+
+typedef enum {
+    ADDR_MULTICAST = 1,
+    ADDR_UNICAST
+} _address_type_t;
+
 typedef enum {
     STOPPED = 0,
     IDLE = 1,
     ADVERTISING = 2
 } _adv_instance_status_t;
+
+typedef struct {
+    uint8_t buf[JELLING_MTU+JELLING_HDR_RESERVED];
+    size_t len;
+} data_buf_t;
 
 static int _send_pkt(struct os_mbuf *mbuf);
 static int _start_scanner(void);
@@ -44,6 +59,8 @@ static void _on_data(struct ble_gap_event *event, void *arg);
 static int _prepare_mbuf(gnrc_pktsnip_t *pkt, gnrc_netif_hdr_t *hdr, struct os_mbuf *mbuf);
 static size_t _prepare_hdr_in_buf(uint8_t *buf, gnrc_netif_hdr_t *hdr, bool first);
 static int _configure_adv_instance(uint8_t instance);
+static bool _filter_manufacturer_id(uint8_t *data, uint8_t len);
+static uint8_t _filter_next_hop_addr(uint8_t *data, uint8_t len);
 
 static mutex_t _instance_status_lock;
 static _adv_instance_status_t _instance_status[ADV_INSTANCES];
@@ -51,6 +68,7 @@ static jelling_status_t _jelling_status;
 static jelling_config_t _config;
 
 static uint8_t _ble_addr[BLE_ADDR_LEN];
+static uint8_t _ble_mc_addr[BLE_ADDR_LEN];
 
 int jelling_send(gnrc_pktsnip_t* pkt) {
     /* jelling stopped or error appeared */
@@ -276,13 +294,6 @@ static int _gap_event(struct ble_gap_event *event, void *arg)
     return 0;
 }
 
-inline static void print_addr(const void *addr)
-{
-    const uint8_t *u8p = addr;
-    printf("%02x:%02x:%02x:%02x:%02x:%02x",
-                   u8p[5], u8p[4], u8p[3], u8p[2], u8p[1], u8p[0]);
-}
-
 static void _on_data(struct ble_gap_event *event, void *arg)
 {
     /* if we have sth in our filter list */
@@ -301,31 +312,95 @@ static void _on_data(struct ble_gap_event *event, void *arg)
             return;
         }
     }
+    bool jelling_packet = _filter_manufacturer_id((uint8_t *)event->ext_disc.data,
+                        event->ext_disc.length_data);
 
+    /* print info */
     if(_config.scanner_verbose) {
         printf("Address: ");
         bluetil_addr_print(event->ext_disc.addr.val);
-        printf("    Data Length: %d bytes:    ", event->ext_disc.length_data);
+        printf("    Data Length: %d bytes    ", event->ext_disc.length_data);
         switch(event->ext_disc.data_status) {
             case BLE_GAP_EXT_ADV_DATA_STATUS_COMPLETE:
-                printf("COMPLETE\n");
+                printf("COMPLETE    ");
                 break;
             case BLE_GAP_EXT_ADV_DATA_STATUS_INCOMPLETE:
-                printf("INCOMPLETE\n");
+                printf("INCOMPLETE    ");
                 break;
             case BLE_GAP_EXT_ADV_DATA_STATUS_TRUNCATED:
-                printf("TRUNCATED\n");
+                printf("TRUNCATED    ");
                 break;
         }
+        if (jelling_packet) {
+            printf("Jelling packet\n");
+        } else { printf("Unknown packet\n"); }
     }
-}
 
-static void _filter_manufacturer_id(uint8_t *data, uint8_t len) {
+    /* do not process any further if unknown packet */
+    if (!jelling_packet) {
+        return;
+    }
 
+    uint8_t next_hop_match = _filter_next_hop_addr((uint8_t *)event->ext_disc.data+PACKET_NEXT_HOP_OFFSET,
+        event->ext_disc.length_data-PACKET_NEXT_HOP_OFFSET);
+    if(!next_hop_match) {
+        return;
+    }
+
+    /* prepare gnrc pkt */
+    gnrc_pktsnip_t *if_snip;
+    /* destination can be multicast or unicast addr */
+    if (next_hop_match == ADDR_UNICAST) {
+        if_snip = gnrc_netif_hdr_build(event->ext_disc.addr.val, BLE_ADDR_LEN,
+                        _ble_addr, BLE_ADDR_LEN);
+    } else {
+        if_snip = gnrc_netif_hdr_build(event->ext_disc.addr.val, BLE_ADDR_LEN,
+                        _ble_mc_addr, BLE_ADDR_LEN);
+    }
+
+    /* allocate space in the pktbuf to store the packet */
+    size_t data_size = event->ext_disc.length_data-PACKET_DATA_OFFSET;
+    gnrc_pktsnip_t *payload = gnrc_pktbuf_add(if_snip, NULL, data_size,
+                                nimble_jelling_get_nettype());
+    if (payload == NULL) {
+        gnrc_pktbuf_release(if_snip);
+        printf("Payload allocation failed\n");
+        return;
+    }
+
+    /* copy payload from event into pktbuffer */
+    memcpy(payload->data, event->ext_disc.data+PACKET_DATA_OFFSET, data_size);
+
+    /* finally dispatch the receive packet to gnrc */
+    if (!gnrc_netapi_dispatch_receive(payload->type, GNRC_NETREG_DEMUX_CTX_ALL,
+                                    payload)) {
+        printf("Could not dispatch\n");
+        gnrc_pktbuf_release(payload);
+    }
 }
 
 static void _scan_complete(void) {
 
+}
+
+static uint8_t _filter_next_hop_addr(uint8_t *data, uint8_t len) {
+    /* cmp with own addr and multicast addr */
+    if (memcmp(data, _ble_mc_addr, BLE_ADDR_LEN) == 0) {
+        return ADDR_MULTICAST;
+    }
+    if (memcmp(data, _ble_addr, BLE_ADDR_LEN) == 0) {
+        return ADDR_UNICAST;
+    }
+    return 0;
+}
+
+static bool _filter_manufacturer_id(uint8_t *data, uint8_t len) {
+    if (len > 4) {
+        if (data[2] == VENDOR_ID_1 && data[3] == VENDOR_ID_2) {
+            return true;
+        }
+    }
+    return false;
 }
 
 static int _configure_adv_instance(uint8_t instance) {
@@ -429,6 +504,9 @@ int jelling_init(void)
     ble_hs_id_copy_addr(nimble_riot_own_addr_type, tmp_addr, NULL);
     bluetil_addr_swapped_cp(tmp_addr, _ble_addr);
 
+    /* prepare multicast addr for comparison */
+    memset(_ble_mc_addr, 0xFF, 1);
+    memset(_ble_mc_addr+1, 0, 5);
     return 0;
 }
 
