@@ -79,57 +79,6 @@ static inline int _netdev_init(netdev_t *dev)
     return 0;
 }
 
-static void _print_gnrc_nettype(gnrc_nettype_t t) {
-    switch(t){
-        case GNRC_NETTYPE_IOVEC:
-            printf("GNRC_NETTYPE_IOVEC");
-            break;
-        case GNRC_NETTYPE_NETIF:
-            printf("GNRC_NETTYPE_NETIF");
-            break;
-        case GNRC_NETTYPE_UNDEF:
-            printf("GNRC_NETTYPE_UNDEF");
-            break;
-        case GNRC_NETTYPE_SIXLOWPAN:
-            printf("GNRC_NETTYPE_SIXLOWPAN");
-            break;
-#if IS_USED(MODULE_GNRC_NETTYPE_GOMACH)
-        case GNRC_NETTYPE_GOMACH:
-            printf("GNRC_NETTYPE_GOMACH");
-            break;
-#endif
-#if IS_USED(MODULE_GNRC_NETTYPE_LWMAC)
-        case GNRC_NETTYPE_LWMAC:
-            printf("GNRC_NETTYPE_LWMAC");
-            break;
-#endif
-        case GNRC_NETTYPE_IPV6:
-            printf("GNRC_NETTYPE_IPV6");
-            break;
-#if IS_USED(MODULE_GNRC_NETTYPE_IPV6_EXT) || defined(DOXYGEN)
-        case GNRC_NETTYPE_IPV6_EXT:
-            printf("GNRC_NETTYPE_IPV6_EXT");
-            break;
-#endif
-        case GNRC_NETTYPE_ICMPV6:
-            printf("GNRC_NETTYPE_ICMPV6");
-            break;
-#if IS_USED(MODULE_GNRC_NETTYPE_TCP)
-        case GNRC_NETTYPE_TCP:
-            printf("GNRC_NETTYPE_TCP");
-            break;
-#endif
-#if IS_USED(MODULE_GNRC_NETTYPE_UDP)
-        case GNRC_NETTYPE_UDP:
-            printf("GNRC_NETTYPE_UDP");
-            break;
-#endif
-        default:
-            printf("OTHER");
-            break;
-    }
-}
-
 static int _netif_send(gnrc_netif_t *netif, gnrc_pktsnip_t *pkt)
 {
     assert(pkt->type == GNRC_NETTYPE_NETIF);

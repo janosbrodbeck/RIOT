@@ -46,11 +46,6 @@ typedef enum {
     ADVERTISING = 2
 } _adv_instance_status_t;
 
-typedef struct {
-    uint8_t buf[JELLING_MTU+JELLING_HDR_RESERVED];
-    size_t len;
-} data_buf_t;
-
 static int _send_pkt(struct os_mbuf *mbuf);
 static int _start_scanner(void);
 static int _gap_event(struct ble_gap_event *event, void *arg);
@@ -406,7 +401,6 @@ static bool _filter_manufacturer_id(uint8_t *data, uint8_t len) {
 static int _configure_adv_instance(uint8_t instance) {
     struct ble_gap_ext_adv_params params = { 0 };
     int8_t selected_tx_power;
-    int duration = INT16_MAX;
 
     memset(&params, 0, sizeof(params));
 
@@ -499,7 +493,6 @@ int jelling_init(void)
     }
 
     /* workaround: save L2 ble random addr */
-    uint8_t own_addr[BLE_ADDR_LEN];
     uint8_t tmp_addr[BLE_ADDR_LEN];
     ble_hs_id_copy_addr(nimble_riot_own_addr_type, tmp_addr, NULL);
     bluetil_addr_swapped_cp(tmp_addr, _ble_addr);
