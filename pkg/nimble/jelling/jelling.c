@@ -195,11 +195,11 @@ static size_t _prepare_hdr_in_buf(uint8_t *buf, gnrc_netif_hdr_t *hdr, bool firs
     /* 2 octet company identifier code */
     memset(buf+len+1, VENDOR_ID_1, 1);
     memset(buf+len+2, VENDOR_ID_2, 1);
+
     len += 3;
     if (first) {
         if (hdr->flags & GNRC_NETIF_HDR_FLAGS_MULTICAST) {
-            memset(buf+len, 0xff, 1);
-            memset(buf+len+1, 0, BLE_ADDR_LEN-1);
+            memcpy(buf+len, _ble_mc_addr, BLE_ADDR_LEN);
         }
         else { /* unicast */
             /* insert destination l2 address */

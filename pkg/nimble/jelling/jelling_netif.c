@@ -134,7 +134,7 @@ static int _netif_send(gnrc_netif_t *netif, gnrc_pktsnip_t *pkt)
 {
     assert(pkt->type == GNRC_NETTYPE_NETIF);
     (void)netif;
-    DEBUG("_netif_send: called\n");
+
     jelling_send(pkt);
     gnrc_pktbuf_release(pkt);
 
