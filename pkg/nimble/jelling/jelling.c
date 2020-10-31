@@ -62,6 +62,7 @@ static _adv_instance_status_t _instance_status[ADV_INSTANCES];
 static jelling_status_t _jelling_status;
 static jelling_config_t _config;
 
+static uint8_t _pkt_next_num;
 static uint8_t _ble_addr[BLE_ADDR_LEN];
 static uint8_t _ble_mc_addr[BLE_ADDR_LEN];
 
@@ -203,6 +204,9 @@ static size_t _prepare_hdr_in_buf(uint8_t *buf, gnrc_netif_hdr_t *hdr, bool firs
         }
         len += BLE_ADDR_LEN;
     }
+    memset(buf+len, _pkt_next_num, 1);
+    len += 1;
+    _pkt_next_num++;
     return len;
 }
 
@@ -480,6 +484,7 @@ int jelling_init(void)
 {
     _jelling_status = JELLING_STOPPED;
     jelling_load_default_config();
+    _pkt_next_num = 0;
     mutex_init(&_instance_status_lock);
 
     int res;
