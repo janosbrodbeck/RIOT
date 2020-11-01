@@ -1,3 +1,6 @@
+#ifndef JELLING_H
+#define JELLING_H
+
 #include "net/gnrc/pktbuf.h"
 #include "net/ble.h"
 
@@ -8,7 +11,7 @@
  *          Specify 0 for no limit.
  */
 #ifndef JELLING_ADVERTISING_EVENTS
-#define JELLING_ADVERTISING_EVENTS          (0)
+#define JELLING_ADVERTISING_EVENTS          0
 #endif
 
 /**
@@ -17,31 +20,40 @@
  *          Units are 10 milliseconds. Specify 0 for no expiration.
  */
 #ifndef JELLING_ADVERTISING_DURATION
-#define JELLING_ADVERTISING_DURATION        (500)
+#define JELLING_ADVERTISING_DURATION        500
 #endif
 
 #ifndef JELLING_SCANNER_ITVL
-#define JELLING_SCANNER_ITVL                (BLE_GAP_SCAN_FAST_INTERVAL_MIN)
+#define JELLING_SCANNER_ITVL                BLE_GAP_SCAN_FAST_INTERVAL_MIN
 #endif
 
 #ifndef JELLING_SCANNER_WINDOW
-#define JELLING_SCANNER_WINDOW              (BLE_GAP_SCAN_FAST_WINDOW)
+#define JELLING_SCANNER_WINDOW              BLE_GAP_SCAN_FAST_WINDOW
 #endif
 
 #ifndef JELLING_SCANNER_DURATION
-#define JELLING_SCANNER_DURATION            (0)
+#define JELLING_SCANNER_DURATION            0
 #endif
 
 #ifndef JELLING_SCANNER_PERIOD
-#define JELLING_SCANNER_PERIOD              (0)
+#define JELLING_SCANNER_PERIOD              0
 #endif
 
 #ifndef JELLING_SCANNER_WAIT_TILL_NEXT
-#define JELLING_SCANNER_WAIT_TILL_NEXT      (150)
+#define JELLING_SCANNER_WAIT_TILL_NEXT      150
 #endif
 
 #ifndef JELLING_SCANNER_FILTER_SIZE
-#define JELLING_SCANNER_FILTER_SIZE         (3)
+#define JELLING_SCANNER_FILTER_SIZE         3
+#endif
+
+/**
+ * @brief   Enable or disable duplicate detection. If disabled, the BLE controller
+ *          still filters for duplicates! In crowded areas this system tries to
+ *          filter when the controller fails (due to high traffic).
+ */
+#ifndef JELLING_DUPLICATE_DETECTION_ENABLE
+#define JELLING_DUPLICATE_DETECTION_ENABLE  0
 #endif
 
 /**
@@ -82,3 +94,5 @@ void jelling_filter_clear(void);
 
 void jelling_print_config(void);
 void jelling_print_info(void);
+
+#endif /* JELLING_H */

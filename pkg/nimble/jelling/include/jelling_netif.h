@@ -32,13 +32,13 @@ extern "C" {
          pulls in some other RIOT headers that clash with NimBLE header (e.g.
  *       byteorder.h vs. endian.h) */
 #ifndef JELLING_MTU
-#define JELLING_MTU             (1280)
+#define JELLING_MTU             1280
 #endif
 /**
  * @brief   Reserved bytes for flags and headers
  */
 #ifndef JELLING_HDR_RESERVED
-#define JELLING_HDR_RESERVED    (64)
+#define JELLING_HDR_RESERVED    64
 #endif
 
 /**
@@ -54,5 +54,5 @@ gnrc_nettype_t nimble_jelling_get_nettype(void);
 }
 #endif
 
-#endif /* NIMBLE_NETIF_H */
+#endif /* JELLING_NETIF_H */
 /** @} */
