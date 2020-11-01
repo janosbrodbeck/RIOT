@@ -234,6 +234,7 @@ static int _send_pkt(struct os_mbuf *mbuf)
     mutex_unlock(&_instance_status_lock);
 
     if (instance == -1) {
+        printf("Info: could not find idle advertising instance. Skipping packet\n");
         return -1;
     }
 

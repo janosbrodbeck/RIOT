@@ -157,7 +157,6 @@ static inline int _netdev_set(netdev_t *dev, netopt_t opt,
     return res;
 }
 
-
 static const gnrc_netif_ops_t _nimble_netif_ops = {
     .init = _netif_init,
     .send = _netif_send,
@@ -166,7 +165,6 @@ static const gnrc_netif_ops_t _nimble_netif_ops = {
     .set = gnrc_netif_set_from_netdev,
     .msg_handler = NULL,
 };
-
 
 static const netdev_driver_t _nimble_netdev_driver = {
     .send = NULL,
@@ -180,7 +178,6 @@ static const netdev_driver_t _nimble_netdev_driver = {
 static netdev_t _nimble_netdev_dummy = {
     .driver = &_nimble_netdev_driver,
 };
-
 
 void jelling_netif_init(void)
 {
