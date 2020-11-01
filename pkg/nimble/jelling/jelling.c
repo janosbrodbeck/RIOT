@@ -62,6 +62,9 @@ static _adv_instance_status_t _instance_status[ADV_INSTANCES];
 static jelling_status_t _jelling_status;
 static jelling_config_t _config;
 
+static gnrc_netif_t *_netif;
+static gnrc_nettype_t _nettype;
+
 static uint8_t _pkt_next_num;
 static uint8_t _ble_addr[BLE_ADDR_LEN];
 static uint8_t _ble_mc_addr[BLE_ADDR_LEN];
@@ -357,10 +360,13 @@ static void _on_data(struct ble_gap_event *event, void *arg)
                         _ble_mc_addr, BLE_ADDR_LEN);
     }
 
+    /* we need to add the device PID to the netif header */
+    gnrc_netif_hdr_set_netif(if_snip->data, _netif);
+
     /* allocate space in the pktbuf to store the packet */
     size_t data_size = event->ext_disc.length_data-PACKET_DATA_OFFSET;
     gnrc_pktsnip_t *payload = gnrc_pktbuf_add(if_snip, NULL, data_size,
-                                nimble_jelling_get_nettype());
+                                _nettype);
     if (payload == NULL) {
         gnrc_pktbuf_release(if_snip);
         printf("Payload allocation failed\n");
@@ -480,8 +486,10 @@ void jelling_stop(void)
     _jelling_status = JELLING_STOPPED;
 }
 
-int jelling_init(void)
+int jelling_init(gnrc_netif_t *netif, gnrc_nettype_t nettype)
 {
+    _netif = netif;
+    _nettype = nettype;
     _jelling_status = JELLING_STOPPED;
     jelling_load_default_config();
     _pkt_next_num = 0;

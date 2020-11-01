@@ -81,7 +81,7 @@ typedef struct {
     filter_entry_t scanner_filter[JELLING_SCANNER_FILTER_SIZE];
 } jelling_config_t;
 
-int jelling_init(void);
+int jelling_init(gnrc_netif_t *netif, gnrc_nettype_t nettype);
 void jelling_start(void);
 void jelling_stop(void);
 
