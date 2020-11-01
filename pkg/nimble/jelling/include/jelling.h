@@ -71,6 +71,17 @@
 #endif
 
 /**
+ *  @brief  Manufacturer ID used for advertising. Don't use any of those listed here:
+ *          https://www.bluetooth.com/de/specifications/assigned-numbers/company-identifiers/
+ */
+#ifndef VENDOR_ID_1
+#define VENDOR_ID_1             (0xFE)
+#endif
+#ifndef VENDOR_ID_2
+#define VENDOR_ID_2             (0xED)
+#endif
+
+/**
  * @brief   Status types of the NimBLE jelling module
  */
 typedef enum {
