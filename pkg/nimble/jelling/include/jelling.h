@@ -1,6 +1,7 @@
 #ifndef JELLING_H
 #define JELLING_H
 
+#include "net/gnrc/netif.h"
 #include "net/gnrc/pktbuf.h"
 #include "net/ble.h"
 
@@ -11,7 +12,7 @@
  *          Specify 0 for no limit.
  */
 #ifndef JELLING_ADVERTISING_EVENTS
-#define JELLING_ADVERTISING_EVENTS          0
+#define JELLING_ADVERTISING_EVENTS                      3
 #endif
 
 /**
@@ -20,7 +21,7 @@
  *          Units are 10 milliseconds. Specify 0 for no expiration.
  */
 #ifndef JELLING_ADVERTISING_DURATION
-#define JELLING_ADVERTISING_DURATION        500
+#define JELLING_ADVERTISING_DURATION                    0
 #endif
 
 #ifndef JELLING_SCANNER_ITVL
@@ -32,28 +33,41 @@
 #endif
 
 #ifndef JELLING_SCANNER_DURATION
-#define JELLING_SCANNER_DURATION            0
+#define JELLING_SCANNER_DURATION                        0
 #endif
 
 #ifndef JELLING_SCANNER_PERIOD
-#define JELLING_SCANNER_PERIOD              0
+#define JELLING_SCANNER_PERIOD                          0
 #endif
 
 #ifndef JELLING_SCANNER_WAIT_TILL_NEXT
-#define JELLING_SCANNER_WAIT_TILL_NEXT      150
+#define JELLING_SCANNER_WAIT_TILL_NEXT                  150
 #endif
 
 #ifndef JELLING_SCANNER_FILTER_SIZE
-#define JELLING_SCANNER_FILTER_SIZE         3
+#define JELLING_SCANNER_FILTER_SIZE                     3
 #endif
 
 /**
  * @brief   Enable or disable duplicate detection. If disabled, the BLE controller
  *          still filters for duplicates! In crowded areas this system tries to
  *          filter when the controller fails (due to high traffic).
+ *
+ *          Note: If disabled: duplicate detection will not be compiled into
+ *                jelling!
  */
 #ifndef JELLING_DUPLICATE_DETECTION_ENABLE
-#define JELLING_DUPLICATE_DETECTION_ENABLE  0
+#define JELLING_DUPLICATE_DETECTION_ENABLE              0
+#endif
+
+#if JELLING_DUPLICATE_DETECTION_ENABLE
+/**
+ *  @brief  Default value whether duplicate detection should be automatically
+ *          activated
+ */
+#ifndef JELLING_DUPLICATE_DETECTION_ACTIVATION_DFTL
+#define JELLING_DUPLICATE_DETECTION_ACTIVATION_DFTL     0
+#endif
 #endif
 
 /**
@@ -79,6 +93,9 @@ typedef struct {
     bool scanner_verbose;
     bool scanner_filter_empty;
     filter_entry_t scanner_filter[JELLING_SCANNER_FILTER_SIZE];
+#if JELLING_DUPLICATE_DETECTION_ENABLE
+    bool duplicate_detection_enable;
+#endif
 } jelling_config_t;
 
 int jelling_init(gnrc_netif_t *netif, gnrc_nettype_t nettype);

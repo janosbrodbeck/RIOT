@@ -15,19 +15,14 @@ void jelling_dd_init(void) {
 }
 
 void jelling_dd_add(uint8_t *addr, uint8_t pkt_num) {
-    duplicate_detection_entry_t entry;
-    memcpy(entry.addr, addr, sizeof(BLE_ADDR_LEN));
-    entry.pkt_num = pkt_num;
-
     /* insert into ringbuffer/list */
     mutex_lock(&_lock);
-    memcpy(&entry, _entries+_pos, sizeof(duplicate_detection_entry_t));
+    memcpy(_entries[_pos].addr, addr, BLE_ADDR_LEN);
+    _entries[_pos].pkt_num = pkt_num;
     mutex_unlock(&_lock);
 
-    DEBUG("DD: Inserted entry at position %d\n", _pos);
-
     _pos++;
-    if (_pos == JELLING_DUPLICATE_DETECTION_ENTRY_COUNT-1) {
+    if (_pos == JELLING_DUPLICATE_DETECTION_ENTRY_COUNT) {
         _pos = 0;
     }
 }

@@ -187,7 +187,7 @@ void jelling_netif_init(void)
     int res;
     DEBUG("jelling_netif_init: called\n");
 
-    res = jelling_init();
+    res = jelling_init(&_netif,_nettype);
     assert (res == 0);
     gnrc_netif_create(&_netif, _stack, sizeof(_stack), GNRC_NETIF_PRIO,
                     "jelling_netif", &_nimble_netdev_dummy, &_nimble_netif_ops);

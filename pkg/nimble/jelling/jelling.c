@@ -17,6 +17,9 @@
 
 #include "jelling_netif.h"
 #include "jelling.h"
+#if JELLING_DUPLICATE_DETECTION_ENABLE
+    #include "jelling_duplicate_detection.h"
+#endif
 
 #include "nimble_riot.h"
 #include "host/ble_gap.h"
@@ -33,7 +36,8 @@
 /* offset between data type (manufacturer specific data) and
  * start of next hop address */
 #define PACKET_NEXT_HOP_OFFSET  (4)
-#define PACKET_DATA_OFFSET      (10)
+#define PACKET_PKG_NUM_OFFSET   (10)
+#define PACKET_DATA_OFFSET      (11)
 
 typedef enum {
     ADDR_MULTICAST = 1,
@@ -349,6 +353,17 @@ static void _on_data(struct ble_gap_event *event, void *arg)
         return;
     }
 
+#if JELLING_DUPLICATE_DETECTION_ENABLE
+    if (_config.duplicate_detection_enable) {
+        uint8_t num;
+        memcpy(&num, event->ext_disc.data+PACKET_PKG_NUM_OFFSET, 1);
+        if (jelling_dd_check_for_entry(event->ext_disc.addr.val, num)) {
+            return;
+        }
+        jelling_dd_add(event->ext_disc.addr.val, num);
+    }
+#endif
+
     /* prepare gnrc pkt */
     gnrc_pktsnip_t *if_snip;
     /* destination can be multicast or unicast addr */
@@ -490,9 +505,14 @@ int jelling_init(gnrc_netif_t *netif, gnrc_nettype_t nettype)
 {
     _netif = netif;
     _nettype = nettype;
+
     _jelling_status = JELLING_STOPPED;
     jelling_load_default_config();
     _pkt_next_num = 0;
+#if JELLING_DUPLICATE_DETECTION_ENABLE
+    jelling_dd_init();
+#endif
+
     mutex_init(&_instance_status_lock);
 
     int res;
@@ -611,6 +631,9 @@ void jelling_load_default_config(void)
         _config.scanner_filter[i].empty = true;
     }
     _config.scanner_filter_empty = true;
+#if JELLING_DUPLICATE_DETECTION_ENABLE
+    _config.duplicate_detection_enable = JELLING_DUPLICATE_DETECTION_ACTIVATION_DFTL;
+#endif
 }
 
 jelling_config_t *jelling_get_config(void) {
@@ -649,4 +672,9 @@ void jelling_print_config(void) {
     if (empty) {
         printf("Scanner: no address in filter\n");
     }
+#if JELLING_DUPLICATE_DETECTION_ENABLE
+    if (_config.duplicate_detection_enable) {
+        printf("Duplicate detection: enabled\n");
+    } else { printf("Duplicate etection: disabled\n"); }
+#endif
 }
