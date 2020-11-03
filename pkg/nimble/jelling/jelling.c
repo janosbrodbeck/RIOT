@@ -84,7 +84,9 @@ int jelling_send(gnrc_pktsnip_t* pkt) {
         gnrc_pktsnip_t *tmp = pkt;
         while (tmp) {
             if (tmp-> type == GNRC_NETTYPE_ICMPV6) {
-                printf("Skipped ICMP\n");
+                if (_config.advertiser_verbose) {
+                    printf("Skipped ICMP packet\n");
+                }
                 return 0;
             }
             tmp = tmp->next;
@@ -525,11 +527,11 @@ void jelling_filter_clear(void)
 
 void jelling_load_default_config(void)
 {
-    _config.advertiser_enable = true;
-    _config.advertiser_verbose = false;
-    _config.advertiser_block_icmp = false;
-    _config.scanner_enable = true;
-    _config.scanner_verbose = false;
+    _config.advertiser_enable = JELLING_ADVERTISING_ENABLE_DFLT;
+    _config.advertiser_verbose = JELLING_ADVERTISING_VERBOSE_DFLT;
+    _config.advertiser_block_icmp = JELLING_ADVERTISING_BLOCK_ICMP_DFLT;
+    _config.scanner_enable = JELLING_SCANNER_ENABLE_DFLT;
+    _config.scanner_verbose = JELLING_SCANNER_VERBOSE_DFLT;
     memcpy(_config.scanner_filter, 0, sizeof(_config.scanner_filter));
     for (int i=0; i < JELLING_SCANNER_FILTER_SIZE; i++) {
         _config.scanner_filter[i].empty = true;

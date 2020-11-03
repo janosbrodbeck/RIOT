@@ -5,6 +5,18 @@
 #include "net/gnrc/pktbuf.h"
 #include "net/ble.h"
 
+#ifndef JELLING_ADVERTISING_ENABLE_DFLT
+#define JELLING_ADVERTISING_ENABLE_DFLT                 1
+#endif
+
+#ifndef JELLING_ADVERTISING_VERBOSE_DFLT
+#define JELLING_ADVERTISING_VERBOSE_DFLT                0
+#endif
+
+#ifndef JELLING_ADVERTISING_BLOCK_ICMP_DFLT
+#define JELLING_ADVERTISING_BLOCK_ICMP_DFLT             0
+#endif
+
 /**
  * @brief   Number of advertising events that should be sent
  *          before advertising ends and
@@ -24,12 +36,20 @@
 #define JELLING_ADVERTISING_DURATION                    0
 #endif
 
+#ifndef JELLING_SCANNER_ENABLE_DFLT
+#define JELLING_SCANNER_ENABLE_DFLT                     1
+#endif
+
+#ifndef JELLING_SCANNER_VERBOSE_DFLT
+#define JELLING_SCANNER_VERBOSE_DFLT                    0
+#endif
+
 #ifndef JELLING_SCANNER_ITVL
-#define JELLING_SCANNER_ITVL                BLE_GAP_SCAN_FAST_INTERVAL_MIN
+#define JELLING_SCANNER_ITVL                            BLE_GAP_SCAN_FAST_INTERVAL_MIN
 #endif
 
 #ifndef JELLING_SCANNER_WINDOW
-#define JELLING_SCANNER_WINDOW              BLE_GAP_SCAN_FAST_WINDOW
+#define JELLING_SCANNER_WINDOW                          BLE_GAP_SCAN_FAST_WINDOW
 #endif
 
 #ifndef JELLING_SCANNER_DURATION
@@ -38,10 +58,6 @@
 
 #ifndef JELLING_SCANNER_PERIOD
 #define JELLING_SCANNER_PERIOD                          0
-#endif
-
-#ifndef JELLING_SCANNER_WAIT_TILL_NEXT
-#define JELLING_SCANNER_WAIT_TILL_NEXT                  150
 #endif
 
 #ifndef JELLING_SCANNER_FILTER_SIZE
