@@ -14,11 +14,11 @@
 #endif
 
 #ifndef JELLING_FIRST_FRAGMENT_SIZE
-#define JELLING_FIRST_FRAGMENT_SIZE                     255
+#define JELLING_FIRST_FRAGMENT_SIZE                     228
 #endif
 
 #ifndef JELLING_SUBSEQUENT_FRAGMENT_SIZE
-#define JELLING_SUBSEQUENT_FRAGMENT_SIZE                255
+#define JELLING_SUBSEQUENT_FRAGMENT_SIZE                228
 #endif
 
 int jelling_fragment_into_mbuf(gnrc_pktsnip_t *pkt, struct os_mbuf *mbuf,

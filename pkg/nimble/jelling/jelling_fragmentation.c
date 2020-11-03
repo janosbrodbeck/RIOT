@@ -5,20 +5,20 @@
 
 #if ENABLE_DEBUG
 static void _print_data(uint8_t *data, uint8_t len) {
-    printf("DEBUG: Fragment: ");
+    /*printf("DEBUG: Fragment: ");
     for (int i = 0; i < len; i++) {
         printf("%02X ", data[i]);
-    }
-    printf("\nDEBUG: Fragment size: %d\n", len);
+    } */
+    printf("DEBUG: Fragment size: %d (+1 byte length field)\n", len);
 }
 #endif
 
-size_t _write_hdr(uint8_t *data, uint8_t *next_hop, uint8_t pkt_num, bool first);
+size_t _write_hdr(uint8_t *data, uint8_t *next_hop, uint8_t pkt_num, bool write_next_hop);
 
 int jelling_fragment_into_mbuf(gnrc_pktsnip_t *pkt, struct os_mbuf *mbuf,
                                 uint8_t *next_hop, uint8_t pkt_num) {
     uint8_t data[JELLING_FRAGMENTATION_FRAGMENT_BUF_SIZE];
-    uint8_t len = 0;
+    size_t len = 0;
     uint8_t max_len = JELLING_FIRST_FRAGMENT_SIZE;
     int res;
 
@@ -26,8 +26,8 @@ int jelling_fragment_into_mbuf(gnrc_pktsnip_t *pkt, struct os_mbuf *mbuf,
     len = _write_hdr(data, next_hop, pkt_num, true);
 
     while (pkt) {
-        uint8_t pkt_size = pkt->size;
-        uint8_t pkt_written = 0;
+        size_t pkt_size = pkt->size;
+        size_t pkt_written = 0;
         while (pkt_written != pkt_size) {
             /* do we fit into the current fragment? */
             if(pkt_size - pkt_written <= max_len-len) {
@@ -36,8 +36,8 @@ int jelling_fragment_into_mbuf(gnrc_pktsnip_t *pkt, struct os_mbuf *mbuf,
                 pkt_written += pkt_size-pkt_written;
             } else { /* we don't fit */
                 memcpy(data+len, pkt->data+pkt_written, max_len-len);
-                len += max_len-len;
                 pkt_written += max_len-len;
+                len = max_len;
             }
 
             /* fragment is full */
@@ -47,14 +47,17 @@ int jelling_fragment_into_mbuf(gnrc_pktsnip_t *pkt, struct os_mbuf *mbuf,
                 res = os_mbuf_append(mbuf, data, len);
                 if (res != 0 ) { return res; }
 
+#if ENABLE_DEBUG
+                _print_data(data, len);
+#endif
                 /* reset */
                 len = 0;
+
                 /* there is more data */
-                if (pkt_written != pkt_size || pkt->next != NULL) {
-#if ENABLE_DEBUG
-                    _print_data(data, len);
-#endif
-                    len = _write_hdr(data, next_hop, pkt_num, false);
+                if (pkt_written != pkt_size ||
+                        (pkt->next != NULL && pkt->next->size != 0)) {
+                    pkt_num++;
+                    len = _write_hdr(data, next_hop, pkt_num, true);
                     max_len = JELLING_SUBSEQUENT_FRAGMENT_SIZE;
                 }
             }
@@ -74,10 +77,10 @@ int jelling_fragment_into_mbuf(gnrc_pktsnip_t *pkt, struct os_mbuf *mbuf,
 #if ENABLE_DEBUG
     printf("DEBUG: Fragmentation completed\n");
 #endif
-    return res;
+    return res < 0 ? -1 : res;
 }
 
-size_t _write_hdr(uint8_t *data, uint8_t *next_hop, uint8_t pkt_num, bool first) {
+size_t _write_hdr(uint8_t *data, uint8_t *next_hop, uint8_t pkt_num, bool write_next_hop) {
     uint8_t len = 0;
     memset(data+len, BLE_GAP_AD_VENDOR, 1);
     len++;
@@ -85,7 +88,7 @@ size_t _write_hdr(uint8_t *data, uint8_t *next_hop, uint8_t pkt_num, bool first)
     len++;
     memset(data+len, VENDOR_ID_2, 1);
     len++;
-    if (first) {
+    if (write_next_hop) {
         memcpy(data+len, next_hop, BLE_ADDR_LEN);
         len += BLE_ADDR_LEN;
     }
