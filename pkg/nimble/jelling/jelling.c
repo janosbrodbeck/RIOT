@@ -110,7 +110,7 @@ int jelling_send(gnrc_pktsnip_t* pkt) {
     }
     _pkt_next_num++;
 
-    if (res != 0) {
+    if (res < 0) {
         printf("jelling_send: fragmentation failed. Return code: %02X\n", res);
         os_mbuf_free_chain(buf);
         return -1;
@@ -142,19 +142,21 @@ static int _send_pkt(struct os_mbuf *mbuf)
         printf("Info: could not find idle advertising instance. Skipping packet\n");
         return -1;
     }
-
+    DEBUG("DEBUG: Set data\n");
     res = ble_gap_ext_adv_set_data(instance, mbuf);
     if (res) {
         printf("Could not set advertising data: 0x%02X\n", res);
         return res;
     }
-
+    DEBUG("DEBUG: Set data competed\n");
+    DEBUG("DEBUG: Adv start\n");
     res = ble_gap_ext_adv_start(instance, JELLING_ADVERTISING_DURATION,
                             JELLING_ADVERTISING_EVENTS);
     if (res) {
         printf("Couldn't start advertising. Return code: 0x%02X\n", res);
         return -1;
     }
+    DEBUG("DEBUG: Adv start completed\n");
     return res;
 }
 
@@ -227,6 +229,11 @@ static void _on_data(struct ble_gap_event *event, void *arg)
     bool jelling_packet = _filter_manufacturer_id((uint8_t *)event->ext_disc.data,
                         event->ext_disc.length_data);
 
+    /* do not process any further if unknown packet */
+    if (!jelling_packet) {
+        return;
+    }
+
     /* print info */
     if(_config.scanner_verbose) {
         printf("Address: ");
@@ -246,11 +253,6 @@ static void _on_data(struct ble_gap_event *event, void *arg)
         if (jelling_packet) {
             printf("Jelling packet\n");
         } else { printf("Unknown packet\n"); }
-    }
-
-    /* do not process any further if unknown packet */
-    if (!jelling_packet) {
-        return;
     }
 
     uint8_t next_hop_match = _filter_next_hop_addr((uint8_t *)event->ext_disc.data+PACKET_NEXT_HOP_OFFSET,
@@ -346,6 +348,7 @@ static int _configure_adv_instance(uint8_t instance) {
     params.tx_power = 127;
     params.primary_phy = BLE_HCI_LE_PHY_1M;
     params.secondary_phy = BLE_HCI_LE_PHY_1M;
+    params.sid = 0;
 
     int rc = ble_gap_ext_adv_configure(instance, &params, &selected_tx_power, _gap_event, NULL);
     if (rc) {
