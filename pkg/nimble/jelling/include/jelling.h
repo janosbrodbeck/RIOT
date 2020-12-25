@@ -120,9 +120,7 @@ typedef struct {
     bool scanner_verbose;
     bool scanner_filter_empty;
     filter_entry_t scanner_filter[JELLING_SCANNER_FILTER_SIZE];
-#if JELLING_DUPLICATE_DETECTION_ENABLE
     bool duplicate_detection_enable;
-#endif
 } jelling_config_t;
 
 int jelling_init(gnrc_netif_t *netif, gnrc_nettype_t nettype);

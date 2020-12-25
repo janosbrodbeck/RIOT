@@ -18,9 +18,8 @@
 #include "jelling_netif.h"
 #include "jelling.h"
 #include "jelling_fragmentation.h"
-#if JELLING_DUPLICATE_DETECTION_ENABLE
-    #include "jelling_duplicate_detection.h"
-#endif
+#include "jelling_duplicate_detection.h"
+
 
 #include "nimble_riot.h"
 #include "host/ble_gap.h"
@@ -261,16 +260,16 @@ static void _on_data(struct ble_gap_event *event, void *arg)
         return;
     }
 
-#if JELLING_DUPLICATE_DETECTION_ENABLE
-    if (_config.duplicate_detection_enable) {
-        uint8_t num;
-        memcpy(&num, event->ext_disc.data+PACKET_PKG_NUM_OFFSET, 1);
-        if (jelling_dd_check_for_entry(event->ext_disc.addr.val, num)) {
-            return;
+    if (IS_ACTIVE(JELLING_DUPLICATE_DETECTION_ENABLE)) {
+        if (_config.duplicate_detection_enable) {
+            uint8_t num;
+            memcpy(&num, event->ext_disc.data+PACKET_PKG_NUM_OFFSET, 1);
+            if (jelling_dd_check_for_entry(event->ext_disc.addr.val, num)) {
+                return;
+            }
+            jelling_dd_add(event->ext_disc.addr.val, num);
         }
-        jelling_dd_add(event->ext_disc.addr.val, num);
     }
-#endif
 
     /* prepare gnrc pkt */
     gnrc_pktsnip_t *if_snip;
@@ -418,9 +417,9 @@ int jelling_init(gnrc_netif_t *netif, gnrc_nettype_t nettype)
     _jelling_status = JELLING_STOPPED;
     jelling_load_default_config();
     _pkt_next_num = 0;
-#if JELLING_DUPLICATE_DETECTION_ENABLE
-    jelling_dd_init();
-#endif
+    if (IS_ACTIVE(JELLING_DUPLICATE_DETECTION_ENABLE)) {
+        jelling_dd_init();
+    }
 
     mutex_init(&_instance_status_lock);
 
@@ -453,10 +452,10 @@ void jelling_print_info(void)
     bluetil_addr_swapped_cp(tmp_addr, own_addr);
     printf("Own Address: ");
     bluetil_addr_print(_ble_addr);
-    #ifdef MODULE_GNRC_IPV6
+    if (IS_ACTIVE(MODULE_GNRC_IPV6)) {
         printf(" -> ");
         bluetil_addr_ipv6_l2ll_print(_ble_addr);
-    #endif
+    }
     puts("");
     printf("Advertising instances: %d\n", ADV_INSTANCES);
     printf("MTU: %d bytes\n", JELLING_MTU);
@@ -540,9 +539,9 @@ void jelling_load_default_config(void)
         _config.scanner_filter[i].empty = true;
     }
     _config.scanner_filter_empty = true;
-#if JELLING_DUPLICATE_DETECTION_ENABLE
-    _config.duplicate_detection_enable = JELLING_DUPLICATE_DETECTION_ACTIVATION_DFTL;
-#endif
+    if (IS_ACTIVE(JELLING_DUPLICATE_DETECTION_ENABLE)) {
+        _config.duplicate_detection_enable = JELLING_DUPLICATE_DETECTION_ACTIVATION_DFTL;
+    }
 }
 
 jelling_config_t *jelling_get_config(void) {
@@ -581,9 +580,9 @@ void jelling_print_config(void) {
     if (empty) {
         printf("Scanner: no address in filter\n");
     }
-#if JELLING_DUPLICATE_DETECTION_ENABLE
-    if (_config.duplicate_detection_enable) {
-        printf("Duplicate detection: enabled\n");
-    } else { printf("Duplicate etection: disabled\n"); }
-#endif
+    if (IS_ACTIVE(JELLING_DUPLICATE_DETECTION_ENABLE)) {
+        if (_config.duplicate_detection_enable) {
+            printf("Duplicate detection: enabled\n");
+        } else { printf("Duplicate etection: disabled\n"); }
+    }
 }
