@@ -49,7 +49,6 @@ typedef enum {
 static int _send_pkt(struct os_mbuf *mbuf);
 static int _start_scanner(void);
 static int _gap_event(struct ble_gap_event *event, void *arg);
-static void _scan_complete(void);
 static void _on_data(struct ble_gap_event *event, void *arg);
 static int _configure_adv_instance(uint8_t instance);
 static bool _filter_manufacturer_id(uint8_t *data, uint8_t len);
@@ -199,7 +198,6 @@ static int _gap_event(struct ble_gap_event *event, void *arg)
             return 0;
         case BLE_GAP_EVENT_DISC_COMPLETE:
             printf("BLE_GAP_EVENT_DISC_COMPLETE\n");
-            _scan_complete();
             return 0;
 
     }
@@ -303,10 +301,6 @@ static void _on_data(struct ble_gap_event *event, void *arg)
         printf("Could not dispatch\n");
         gnrc_pktbuf_release(payload);
     }
-}
-
-static void _scan_complete(void) {
-
 }
 
 static uint8_t _filter_next_hop_addr(uint8_t *data, uint8_t len) {
