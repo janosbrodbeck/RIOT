@@ -50,13 +50,13 @@ int _nimble_jelling_handler(int argc, char **argv)
     }
     if (memcmp(argv[1], "config", 6) == 0) {
         if (argc == 2) {
-#if JELLING_DUPLICATE_DETECTION_ENABLE
-            printf("config usage: [info|default|icmp|dd|filter {ADDR}/clear|scanner blank/verbose|"
-            "advertiser blank/verbose]\n");
-#else
-            printf("config usage: [info|default|icmp|filter {ADDR}/clear|scanner blank/verbose|"
-            "advertiser blank/verbose]\n");
-#endif
+            if (IS_ACTIVE(JELLING_DUPLICATE_DETECTION_FEATURE_ENABLE)) {
+                printf("config usage: [info|default|icmp|dd|filter {ADDR}/clear|scanner blank/verbose|"
+                "advertiser blank/verbose]\n");
+            } else {
+                printf("config usage: [info|default|icmp|filter {ADDR}/clear|scanner blank/verbose|"
+                "advertiser blank/verbose]\n");
+            }
             return 0;
         }
 
@@ -72,16 +72,16 @@ int _nimble_jelling_handler(int argc, char **argv)
         }
 
         jelling_config_t *config = jelling_get_config();
-#if JELLING_DUPLICATE_DETECTION_ENABLE
-        /* toggle duplicate detection */
-        if (memcmp(argv[2], "dd", 2) == 0) {
-            config->duplicate_detection_enable = !config->duplicate_detection_enable;
-            if (config->duplicate_detection_enable) {
-                printf("Config: set duplicate detection enabled\n");
-            } else { printf("Config: set duplicate detection disabled\n"); }
-            return 0;
+        if (IS_ACTIVE(JELLING_DUPLICATE_DETECTION_FEATURE_ENABLE)) {
+            /* toggle duplicate detection */
+            if (memcmp(argv[2], "dd", 2) == 0) {
+                config->duplicate_detection_enable = !config->duplicate_detection_enable;
+                if (config->duplicate_detection_enable) {
+                    printf("Config: set duplicate detection enabled\n");
+                } else { printf("Config: set duplicate detection disabled\n"); }
+                return 0;
+            }
         }
-#endif
 
         /* toggle icmp */
         if (memcmp(argv[2], "icmp", 4) == 0) {

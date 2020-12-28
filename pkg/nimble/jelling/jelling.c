@@ -27,8 +27,6 @@
 #include "host/ble_hs_adv.h"
 #include "host/util/util.h"
 
-#define ENABLE_DEBUG            (0)
-#include "debug.h"
 #define ADV_INSTANCES           (MYNEWT_VAL_BLE_MULTI_ADV_INSTANCES+1)
 
 /* offset between data type (manufacturer specific data) and
@@ -141,21 +139,22 @@ static int _send_pkt(struct os_mbuf *mbuf)
         printf("Info: could not find idle advertising instance. Skipping packet\n");
         return -1;
     }
-    DEBUG("DEBUG: Set data\n");
     res = ble_gap_ext_adv_set_data(instance, mbuf);
     if (res) {
         printf("Could not set advertising data: 0x%02X\n", res);
         return res;
     }
-    DEBUG("DEBUG: Set data competed\n");
-    DEBUG("DEBUG: Adv start\n");
+
     res = ble_gap_ext_adv_start(instance, JELLING_ADVERTISING_DURATION,
                             JELLING_ADVERTISING_EVENTS);
     if (res) {
         printf("Couldn't start advertising. Return code: 0x%02X\n", res);
         return -1;
     }
-    DEBUG("DEBUG: Adv start completed\n");
+
+    if(IS_ACTIVE(JELLING_DEBUG_ADVERTISING_PROCESS)) {
+        printf("DEBUG: Advertising for packet started successfully\n");
+    }
     return res;
 }
 
@@ -260,7 +259,7 @@ static void _on_data(struct ble_gap_event *event, void *arg)
         return;
     }
 
-    if (IS_ACTIVE(JELLING_DUPLICATE_DETECTION_ENABLE)) {
+    if (IS_ACTIVE(JELLING_DUPLICATE_DETECTION_FEATURE_ENABLE)) {
         if (_config.duplicate_detection_enable) {
             uint8_t num;
             memcpy(&num, event->ext_disc.data+PACKET_PKG_NUM_OFFSET, 1);
@@ -369,7 +368,6 @@ static int _configure_adv_instance(uint8_t instance) {
         return -1;
     }
 
-    DEBUG("Instance %u configured (selected tx power: %d)\n", instance, selected_tx_power);
     return rc;
 }
 
@@ -417,7 +415,7 @@ int jelling_init(gnrc_netif_t *netif, gnrc_nettype_t nettype)
     _jelling_status = JELLING_STOPPED;
     jelling_load_default_config();
     _pkt_next_num = 0;
-    if (IS_ACTIVE(JELLING_DUPLICATE_DETECTION_ENABLE)) {
+    if (IS_ACTIVE(JELLING_DUPLICATE_DETECTION_FEATURE_ENABLE)) {
         jelling_dd_init();
     }
 
@@ -539,7 +537,7 @@ void jelling_load_default_config(void)
         _config.scanner_filter[i].empty = true;
     }
     _config.scanner_filter_empty = true;
-    if (IS_ACTIVE(JELLING_DUPLICATE_DETECTION_ENABLE)) {
+    if (IS_ACTIVE(JELLING_DUPLICATE_DETECTION_FEATURE_ENABLE)) {
         _config.duplicate_detection_enable = JELLING_DUPLICATE_DETECTION_ACTIVATION_DFTL;
     }
 }
@@ -580,7 +578,7 @@ void jelling_print_config(void) {
     if (empty) {
         printf("Scanner: no address in filter\n");
     }
-    if (IS_ACTIVE(JELLING_DUPLICATE_DETECTION_ENABLE)) {
+    if (IS_ACTIVE(JELLING_DUPLICATE_DETECTION_FEATURE_ENABLE)) {
         if (_config.duplicate_detection_enable) {
             printf("Duplicate detection: enabled\n");
         } else { printf("Duplicate etection: disabled\n"); }

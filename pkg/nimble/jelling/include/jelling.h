@@ -72,11 +72,11 @@
  *          Note: If disabled: duplicate detection will not be compiled into
  *                jelling!
  */
-#ifndef JELLING_DUPLICATE_DETECTION_ENABLE
-#define JELLING_DUPLICATE_DETECTION_ENABLE              0
+#ifndef JELLING_DUPLICATE_DETECTION_FEATURE_ENABLE
+#define JELLING_DUPLICATE_DETECTION_FEATURE_ENABLE              0
 #endif
 
-#if JELLING_DUPLICATE_DETECTION_ENABLE
+#if JELLING_DUPLICATE_DETECTION_FEATURE_ENABLE
 /**
  *  @brief  Default value whether duplicate detection should be automatically
  *          activated
