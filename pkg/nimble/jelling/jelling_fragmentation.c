@@ -5,11 +5,11 @@
 
 #if ENABLE_DEBUG
 static void _print_data(uint8_t *data, uint8_t len) {
-    printf("DEBUG: fragmentation: ");
+    printf("DEBUG: Fragment: ");
     for (int i = 0; i < len; i++) {
         printf("%02X ", data[i]);
     }
-    puts("");
+    printf("\nDEBUG: Fragment size: %d\n", len);
 }
 #endif
 
@@ -17,12 +17,12 @@ size_t _write_hdr(uint8_t *data, uint8_t *next_hop, uint8_t pkt_num, bool first)
 
 int jelling_fragment_into_mbuf(gnrc_pktsnip_t *pkt, struct os_mbuf *mbuf,
                                 uint8_t *next_hop, uint8_t pkt_num) {
-    uint8_t data[JELLING_FRAGMENTATION_FRAGMENT_SIZE];
+    uint8_t data[JELLING_FRAGMENTATION_FRAGMENT_BUF_SIZE];
     uint8_t len = 0;
-    uint8_t max_len = JELLING_FRAGMENTATION_FIRST_FRAGMENT_SIZE;
+    uint8_t max_len = JELLING_FIRST_FRAGMENT_SIZE;
     int res;
 
-    DEBUG("DEBUG: about to send %d bytes\n", gnrc_pkt_len(pkt));
+    DEBUG("DEBUG: About to fragment %d bytes\n", gnrc_pkt_len(pkt));
     len = _write_hdr(data, next_hop, pkt_num, true);
 
     while (pkt) {
@@ -46,15 +46,16 @@ int jelling_fragment_into_mbuf(gnrc_pktsnip_t *pkt, struct os_mbuf *mbuf,
                 if (res != 0 ) { return res; }
                 res = os_mbuf_append(mbuf, data, len);
                 if (res != 0 ) { return res; }
-#if ENABLE_DEBUG
-                _print_data(data, len);
-#endif
 
                 /* reset */
                 len = 0;
                 /* there is more data */
                 if (pkt_written != pkt_size || pkt->next != NULL) {
+#if ENABLE_DEBUG
+                    _print_data(data, len);
+#endif
                     len = _write_hdr(data, next_hop, pkt_num, false);
+                    max_len = JELLING_SUBSEQUENT_FRAGMENT_SIZE;
                 }
             }
         }
@@ -68,9 +69,11 @@ int jelling_fragment_into_mbuf(gnrc_pktsnip_t *pkt, struct os_mbuf *mbuf,
         res = os_mbuf_append(mbuf, data, len);
 #if ENABLE_DEBUG
         _print_data(data, len);
-        DEBUG("DEBUG: wrote: %d bytes\n", len)
 #endif
     }
+#if ENABLE_DEBUG
+    printf("DEBUG: Fragmentation completed\n");
+#endif
     return res;
 }
 
