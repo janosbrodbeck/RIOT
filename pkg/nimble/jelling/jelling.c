@@ -46,6 +46,13 @@ typedef enum {
     ADVERTISING = 2
 } _adv_instance_status_t;
 
+typedef struct {
+    bool ongoing;
+    uint8_t next_hop_match;
+    uint8_t data[JELLING_MTU];
+    size_t len;
+} _chained_packet;
+
 static int _send_pkt(struct os_mbuf *mbuf);
 static int _start_scanner(void);
 static int _gap_event(struct ble_gap_event *event, void *arg);
@@ -53,6 +60,7 @@ static void _on_data(struct ble_gap_event *event, void *arg);
 static int _configure_adv_instance(uint8_t instance);
 static bool _filter_manufacturer_id(uint8_t *data, uint8_t len);
 static uint8_t _filter_next_hop_addr(uint8_t *data, uint8_t len);
+static size_t _prepare_ipv6_packet(uint8_t *data, size_t len);
 
 static mutex_t _instance_status_lock;
 static _adv_instance_status_t _instance_status[ADV_INSTANCES];
@@ -62,6 +70,7 @@ static jelling_config_t _config;
 static gnrc_netif_t *_netif;
 static gnrc_nettype_t _nettype;
 
+static _chained_packet _chain;
 static uint8_t _pkt_next_num;
 static uint8_t _ble_addr[BLE_ADDR_LEN];
 static uint8_t _ble_mc_addr[BLE_ADDR_LEN];
@@ -110,6 +119,10 @@ int jelling_send(gnrc_pktsnip_t* pkt) {
         printf("jelling_send: fragmentation failed. Return code: %02X\n", res);
         os_mbuf_free_chain(buf);
         return -1;
+    }
+
+    if(IS_ACTIVE(JELLING_DEBUG_IPV6_PACKET_SIZES)) {
+        printf("Sending IPv6 packet of %d bytes\n", gnrc_pkt_len(pkt)-pkt->size);
     }
 
     _send_pkt(buf);
@@ -204,6 +217,38 @@ static int _gap_event(struct ble_gap_event *event, void *arg)
     return 0;
 }
 
+/* magic - avoid touching */
+static size_t _prepare_ipv6_packet(uint8_t *data, size_t len)
+{
+    size_t len_data_type;
+    uint16_t pos_ipv6 = 0;
+    uint16_t pos = 0;
+
+    bool first = true;
+    while (pos < len) {
+        len_data_type = data[pos];
+        if (data[pos+1] != 0xFF) {
+            return -1;
+        }
+
+        if (first) {
+            /* skip jelling header */
+            memcpy(data+pos_ipv6, data+pos+PACKET_DATA_OFFSET, len_data_type-PACKET_DATA_OFFSET);
+            pos_ipv6 += len_data_type-PACKET_DATA_OFFSET;
+            first = false;
+        } else {
+            memcpy(data+pos_ipv6, data+pos+PACKET_NEXT_HOP_OFFSET+1, len_data_type-PACKET_NEXT_HOP_OFFSET);
+            pos_ipv6 += len_data_type-PACKET_NEXT_HOP_OFFSET;
+        }
+        pos += 1 + len_data_type; /* len field is not included in len_data_type */
+    }
+
+    /* make pos to len */
+    pos_ipv6++;
+
+    return pos_ipv6;
+}
+
 static void _on_data(struct ble_gap_event *event, void *arg)
 {
     /* if we have sth in our filter list */
@@ -226,12 +271,12 @@ static void _on_data(struct ble_gap_event *event, void *arg)
                         event->ext_disc.length_data);
 
     /* do not process any further if unknown packet */
-    if (!jelling_packet) {
+    if (!jelling_packet && !_chain.ongoing) {
         return;
     }
 
     /* print info */
-    if(_config.scanner_verbose) {
+    if (_config.scanner_verbose) {
         printf("Address: ");
         bluetil_addr_print(event->ext_disc.addr.val);
         printf("    Data Length: %d bytes    ", event->ext_disc.length_data);
@@ -251,27 +296,64 @@ static void _on_data(struct ble_gap_event *event, void *arg)
         } else { printf("Unknown packet\n"); }
     }
 
-    uint8_t next_hop_match = _filter_next_hop_addr((uint8_t *)event->ext_disc.data+PACKET_NEXT_HOP_OFFSET,
-        event->ext_disc.length_data-PACKET_NEXT_HOP_OFFSET);
-    if(!next_hop_match) {
+    /* No chained packet ongoing -> needs to be the first packet containing
+       the jelling header */
+    if (!_chain.ongoing) {
+       _chain.next_hop_match = _filter_next_hop_addr((uint8_t *)event->ext_disc.data+PACKET_NEXT_HOP_OFFSET,
+            event->ext_disc.length_data-PACKET_NEXT_HOP_OFFSET);
+        if(!_chain.next_hop_match) {
+            return;
+        }
+
+        if (IS_ACTIVE(JELLING_DUPLICATE_DETECTION_FEATURE_ENABLE)) {
+            if (_config.duplicate_detection_enable) {
+                uint8_t num;
+                memcpy(&num, event->ext_disc.data+PACKET_PKG_NUM_OFFSET, 1);
+                if (jelling_dd_check_for_entry(event->ext_disc.addr.val, num)) {
+                    return;
+                }
+                jelling_dd_add(event->ext_disc.addr.val, num);
+            }
+        }
+
+        _chain.len = 0;
+        /* incomplete event, copy data into buffer and prepare for more data  */
+        if (event->ext_disc.data_status == BLE_GAP_EXT_ADV_DATA_STATUS_INCOMPLETE) {
+            _chain.ongoing = true;
+        }
+        memcpy(_chain.data, event->ext_disc.data, event->ext_disc.length_data);
+        _chain.len = event->ext_disc.length_data;
+
+    } else {
+        memcpy(_chain.data+_chain.len, event->ext_disc.data,
+               event->ext_disc.length_data);
+        _chain.len += event->ext_disc.length_data;
+
+        if (event->ext_disc.data_status == BLE_GAP_EXT_ADV_DATA_STATUS_COMPLETE) {
+            _chain.ongoing = false;
+        }
+    }
+
+    if (_chain.ongoing) {
         return;
     }
 
-    if (IS_ACTIVE(JELLING_DUPLICATE_DETECTION_FEATURE_ENABLE)) {
-        if (_config.duplicate_detection_enable) {
-            uint8_t num;
-            memcpy(&num, event->ext_disc.data+PACKET_PKG_NUM_OFFSET, 1);
-            if (jelling_dd_check_for_entry(event->ext_disc.addr.val, num)) {
-                return;
-            }
-            jelling_dd_add(event->ext_disc.addr.val, num);
-        }
+
+    /* Process BLE data */
+    size_t ipv6_packet_size = _prepare_ipv6_packet(_chain.data, _chain.len);
+    if (ipv6_packet_size == -1) {
+        printf("Broken BLE data\n");
+        return;
+    }
+
+    if(IS_ACTIVE(JELLING_DEBUG_IPV6_PACKET_SIZES)) {
+        printf("Received IPv6 packet of %d bytes\n", ipv6_packet_size);
     }
 
     /* prepare gnrc pkt */
     gnrc_pktsnip_t *if_snip;
     /* destination can be multicast or unicast addr */
-    if (next_hop_match == ADDR_UNICAST) {
+    if (_chain.next_hop_match == ADDR_UNICAST) {
         if_snip = gnrc_netif_hdr_build(event->ext_disc.addr.val, BLE_ADDR_LEN,
                         _ble_addr, BLE_ADDR_LEN);
     } else {
@@ -283,8 +365,8 @@ static void _on_data(struct ble_gap_event *event, void *arg)
     gnrc_netif_hdr_set_netif(if_snip->data, _netif);
 
     /* allocate space in the pktbuf to store the packet */
-    size_t data_size = event->ext_disc.length_data-PACKET_DATA_OFFSET;
-    gnrc_pktsnip_t *payload = gnrc_pktbuf_add(if_snip, NULL, data_size,
+    //size_t data_size = _chain.len-PACKET_DATA_OFFSET;
+    gnrc_pktsnip_t *payload = gnrc_pktbuf_add(if_snip, NULL, ipv6_packet_size,
                                 _nettype);
     if (payload == NULL) {
         gnrc_pktbuf_release(if_snip);
@@ -293,7 +375,7 @@ static void _on_data(struct ble_gap_event *event, void *arg)
     }
 
     /* copy payload from event into pktbuffer */
-    memcpy(payload->data, event->ext_disc.data+PACKET_DATA_OFFSET, data_size);
+    memcpy(payload->data, _chain.data, ipv6_packet_size);
 
     /* finally dispatch the receive packet to gnrc */
     if (!gnrc_netapi_dispatch_receive(payload->type, GNRC_NETREG_DEMUX_CTX_ALL,
@@ -340,7 +422,7 @@ static int _configure_adv_instance(uint8_t instance) {
     params.tx_power = 127;
     params.primary_phy = BLE_HCI_LE_PHY_1M;
     params.secondary_phy = BLE_HCI_LE_PHY_1M;
-    params.sid = 0;
+    //params.sid = 0;
 
     int rc = ble_gap_ext_adv_configure(instance, &params, &selected_tx_power, _gap_event, NULL);
     if (rc) {
@@ -410,6 +492,7 @@ int jelling_init(gnrc_netif_t *netif, gnrc_nettype_t nettype)
     jelling_load_default_config();
     _pkt_next_num = 0;
     if (IS_ACTIVE(JELLING_DUPLICATE_DETECTION_FEATURE_ENABLE)) {
+        printf("Init\n");
         jelling_dd_init();
     }
 

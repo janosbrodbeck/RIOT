@@ -46,7 +46,7 @@ int jelling_fragment_into_mbuf(gnrc_pktsnip_t *pkt, struct os_mbuf *mbuf,
                 if (pkt_written != pkt_size ||
                         (pkt->next != NULL && pkt->next->size != 0)) {
                     pkt_num++;
-                    len = _write_hdr(data, next_hop, pkt_num, true);
+                    len = _write_hdr(data, next_hop, pkt_num, false);
                     max_len = JELLING_SUBSEQUENT_FRAGMENT_SIZE;
                 }
             }
