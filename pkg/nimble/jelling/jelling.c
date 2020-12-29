@@ -49,6 +49,7 @@ typedef enum {
 
 typedef struct {
     bool ongoing;
+    uint8_t pkt_num;
     uint8_t next_hop_match;
     uint8_t data[JELLING_MTU];
     size_t len;
@@ -334,14 +335,12 @@ static void _on_data(struct ble_gap_event *event, void *arg)
         }
 
         /* duplicate detection */
+        _chain.pkt_num = event->ext_disc.data[PACKET_PKG_NUM_OFFSET];
         if (IS_ACTIVE(JELLING_DUPLICATE_DETECTION_FEATURE_ENABLE)) {
             if (_config.duplicate_detection_enable) {
-                uint8_t num;
-                memcpy(&num, event->ext_disc.data+PACKET_PKG_NUM_OFFSET, 1);
-                if (jelling_dd_check_for_entry(event->ext_disc.addr.val, num)) {
+                if (jelling_dd_check_for_entry(event->ext_disc.addr.val, _chain.pkt_num)) {
                     return;
                 }
-                jelling_dd_add(event->ext_disc.addr.val, num);
             }
         }
 
@@ -375,12 +374,18 @@ static void _on_data(struct ble_gap_event *event, void *arg)
         return;
     }
 
-
     /* Process BLE data */
     size_t ipv6_packet_size = _prepare_ipv6_packet(_chain.data, _chain.len);
     if (ipv6_packet_size == -1) {
         printf("Broken BLE data\n");
         return;
+    }
+
+    /* add to duplicate detection */
+    if (IS_ACTIVE(JELLING_DUPLICATE_DETECTION_FEATURE_ENABLE)) {
+        if (_config.duplicate_detection_enable) {
+            jelling_dd_add(event->ext_disc.addr.val, _chain.pkt_num);
+        }
     }
 
     if(IS_ACTIVE(JELLING_DEBUG_IPV6_PACKET_SIZES)) {
