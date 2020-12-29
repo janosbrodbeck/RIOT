@@ -108,6 +108,9 @@ int jelling_send(gnrc_pktsnip_t* pkt) {
     gnrc_netif_hdr_t *hdr = (gnrc_netif_hdr_t *)pkt->data;
     int res;
     if (hdr->flags & GNRC_NETIF_HDR_FLAGS_MULTICAST) {
+        if (IS_ACTIVE(JELLING_SKIP_MULTICAST_PACKETS)) {
+            goto exit;
+        }
         res = jelling_fragment_into_mbuf(pkt->next, buf, _ble_mc_addr, _pkt_next_num);
     } else { /* unicast */
         uint8_t *dst_addr = gnrc_netif_hdr_get_dst_addr(hdr);
@@ -127,6 +130,7 @@ int jelling_send(gnrc_pktsnip_t* pkt) {
 
     _send_pkt(buf);
 
+exit:
     os_mbuf_free_chain(buf);
     return 0;
 }
@@ -227,8 +231,11 @@ static size_t _prepare_ipv6_packet(uint8_t *data, size_t len)
     bool first = true;
     while (pos < len) {
         len_data_type = data[pos];
+        if (len_data_type+pos > len || len_data_type+pos_ipv6 > len) {
+            goto error;
+        }
         if (data[pos+1] != 0xFF) {
-            return -1;
+            goto error;
         }
 
         if (first) {
@@ -247,6 +254,19 @@ static size_t _prepare_ipv6_packet(uint8_t *data, size_t len)
     pos_ipv6++;
 
     return pos_ipv6;
+
+error:
+    if (IS_ACTIVE(JELLING_DEBUG_BROKEN_BLE_DATA)) {
+        printf("Broken DATA: \n");
+        for (int i=0; i < len; i++) {
+            printf("%02X ", data[i]);
+            if (i % 30 == 0 && i != 0 && i != 1) {
+                puts("");
+            }
+        }
+        printf("\n========================\n");
+    }
+    return -1;
 }
 
 static void _on_data(struct ble_gap_event *event, void *arg)
@@ -325,6 +345,11 @@ static void _on_data(struct ble_gap_event *event, void *arg)
         _chain.len = event->ext_disc.length_data;
 
     } else {
+        if (_chain.len+event->ext_disc.length_data > sizeof(_chain.data)) {
+            printf("Broken packets from nimBLE\n");
+            _chain.ongoing = false;
+            return;
+        }
         memcpy(_chain.data+_chain.len, event->ext_disc.data,
                event->ext_disc.length_data);
         _chain.len += event->ext_disc.length_data;
