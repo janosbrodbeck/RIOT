@@ -51,11 +51,13 @@ int _nimble_jelling_handler(int argc, char **argv)
     if (memcmp(argv[1], "config", 6) == 0) {
         if (argc == 2) {
             if (IS_ACTIVE(JELLING_DUPLICATE_DETECTION_FEATURE_ENABLE)) {
-                printf("config usage: [info|default|icmp|dd|filter {ADDR}/clear|scanner blank/verbose|"
-                "advertiser blank/verbose]\n");
+                printf("config usage: [info|default|icmp|dd|filter {ADDR}/clear|"
+                "scanner blank/verbose/itvl/period/duration|"
+                "advertiser blank/verbose/duration/max_events/itvl_min/itvl_max]\n");
             } else {
-                printf("config usage: [info|default|icmp|filter {ADDR}/clear|scanner blank/verbose|"
-                "advertiser blank/verbose]\n");
+                printf("config usage: [info|default|icmp|filter {ADDR}/clear|"
+                "scanner blank/verbose/itvl/period/duration|"
+                "advertiser blank/verbose/duration/max_events/itvl_min/itvl_max]\n");
             }
             return 0;
         }
@@ -92,6 +94,7 @@ int _nimble_jelling_handler(int argc, char **argv)
             return 0;
         }
 
+        bool none = true;
         /* scanner toggle or activate verbose */
         if (memcmp(argv[2], "scanner", 7) == 0) {
                 if (argc == 4) { /* verbose */
@@ -100,19 +103,52 @@ int _nimble_jelling_handler(int argc, char **argv)
                         if (config->scanner_verbose) {
                             printf("Config: set scanner verbose\n");
                         } else { printf("Config: set scanner not verbose\n"); }
+                        none = false;
                         return 0;
                     }
-                } else { /* toggle */
+                }
+
+                bool changed = false;
+                if (argc == 5) /* itvl, window, period, duration */
+                {
+                    if (memcmp(argv[3], "itvl", 4) == 0) {
+                        config->scanner_itvl = atoi(argv[4]);
+                        changed = true;
+                        none = false;
+                    }
+                    if (memcmp(argv[3], "window", 6) == 0) {
+                        config->scanner_window = atoi(argv[4]);
+                        changed = true;
+                        none = false;
+                    }
+                    if (memcmp(argv[3], "period", 6) == 0) {
+                        config->scanner_period = atoi(argv[4]);
+                        changed = true;
+                        none = false;
+                    }
+                    if (memcmp(argv[3], "duration", 8) == 0) {
+                        config->scanner_duration = atoi(argv[4]);
+                        changed = true;
+                        none = false;
+                    }
+                }
+
+                if (none) { /* toggle */
                     config->scanner_enable = !config->scanner_enable;
                     if (config->scanner_enable) {
                         printf("Config: set scanner enabled\n");
                     } else { printf("Config: set scanner disabled\n"); }
-                    return 0;
+                    changed = true;
                 }
+                if (changed) {
+                        jelling_restart_scanner();
+                }
+                return 0;
 
         }
 
         /* advertiser toggle or activate verbose */
+        none = true;
         if (memcmp(argv[2], "advertiser", 10) == 0) {
             if (argc == 4) { /* verbose */
                 if (memcmp(argv[3], "verbose", 7) == 0) {
@@ -122,13 +158,43 @@ int _nimble_jelling_handler(int argc, char **argv)
                     } else { printf("Config: set advertiser not verbose\n"); }
                     return 0;
                 }
-            } else { /* toggle */
+            }
+
+            bool changed = false;
+            if (argc == 5) { /* duration, max events, itvl min, itvl max */
+                if (memcmp(argv[3], "duration", 8) == 0) {
+                    config->advertiser_duration = atoi(argv[4]);
+                    changed = true;
+                    none = false;
+                }
+                if (memcmp(argv[3], "itvl_min", 8) == 0) {
+                    config->advertiser_itvl_min = atoi(argv[4]);
+                    changed = true;
+                    none = false;
+                }
+                if (memcmp(argv[3], "itvl_max", 8) == 0) {
+                    config->advertiser_itvl_max = atoi(argv[4]);
+                    changed = true;
+                    none = false;
+                }
+                if (memcmp(argv[3], "max_events", 10) == 0) {
+                    config->advertiser_max_events = atoi(argv[4]);
+                    changed = true;
+                    none = false;
+                }
+            }
+
+            if (none) { /* toggle */
                 config->advertiser_enable = !config->advertiser_enable;
                 if (config->advertiser_enable) {
                     printf("Config: set advertising enabled\n");
                 } else { printf("Config: set advertising disabled\n"); }
-                return 0;
+                changed = true;
             }
+            if (changed) {
+                jelling_restart_advertiser();
+            }
+            return 0;
         }
 
         if (argc == 4) {

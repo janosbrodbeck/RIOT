@@ -23,8 +23,8 @@
  *          a BLE_GAP_EVENT_ADV_COMPLETE event is reported.
  *          Specify 0 for no limit.
  */
-#ifndef JELLING_ADVERTISING_EVENTS
-#define JELLING_ADVERTISING_EVENTS                      3
+#ifndef JELLING_ADVERTISING_EVENTS_DFLT
+#define JELLING_ADVERTISING_EVENTS_DFLT                 3
 #endif
 
 /**
@@ -32,8 +32,20 @@
  *          procedure ends and a BLE_GAP_EVENT_ADV_COMPLETE event is reported.
  *          Units are 10 milliseconds. Specify 0 for no expiration.
  */
-#ifndef JELLING_ADVERTISING_DURATION
-#define JELLING_ADVERTISING_DURATION                    0
+#ifndef JELLING_ADVERTISING_DURATION_DFLT
+#define JELLING_ADVERTISING_DURATION_DFLT               0
+#endif
+
+#ifndef JELLING_ADVERTISING_ITVL_MIN_DFLT
+#define JELLING_ADVERTISING_ITVL_MIN_DFLT               BLE_GAP_ADV_FAST_INTERVAL1_MIN
+#endif
+
+#ifndef JELLING_ADVERTISING_ITVL_MAX_DFLT
+#define JELLING_ADVERTISING_ITVL_MAX_DFLT               BLE_GAP_ADV_FAST_INTERVAL1_MAX
+#endif
+
+#ifndef JELLING_ADVERTISING_MAX_EVENTS_DFLT
+#define JELLING_ADVERTISING_MAX_EVENTS_DFLT             3
 #endif
 
 #ifndef JELLING_SCANNER_ENABLE_DFLT
@@ -44,20 +56,20 @@
 #define JELLING_SCANNER_VERBOSE_DFLT                    0
 #endif
 
-#ifndef JELLING_SCANNER_ITVL
-#define JELLING_SCANNER_ITVL                            BLE_GAP_SCAN_FAST_INTERVAL_MIN
+#ifndef JELLING_SCANNER_ITVL_DFLT
+#define JELLING_SCANNER_ITVL_DFLT                       BLE_GAP_SCAN_FAST_INTERVAL_MIN
 #endif
 
-#ifndef JELLING_SCANNER_WINDOW
-#define JELLING_SCANNER_WINDOW                          BLE_GAP_SCAN_FAST_WINDOW
+#ifndef JELLING_SCANNER_WINDOW_DFLT
+#define JELLING_SCANNER_WINDOW_DFLT                     BLE_GAP_SCAN_FAST_WINDOW
 #endif
 
-#ifndef JELLING_SCANNER_DURATION
-#define JELLING_SCANNER_DURATION                        0
+#ifndef JELLING_SCANNER_DURATION_DFLT
+#define JELLING_SCANNER_DURATION_DFLT                   0
 #endif
 
-#ifndef JELLING_SCANNER_PERIOD
-#define JELLING_SCANNER_PERIOD                          0
+#ifndef JELLING_SCANNER_PERIOD_DFLT
+#define JELLING_SCANNER_PERIOD_DFLT                     0
 #endif
 
 #ifndef JELLING_SCANNER_FILTER_SIZE
@@ -116,9 +128,28 @@ typedef struct {
     bool advertiser_enable;
     bool advertiser_verbose;
     bool advertiser_block_icmp;
+    /* Unit: 10ms */
+    uint16_t advertiser_duration;
+    uint16_t advertiser_max_events;
+    /* Unit: 0.625ms */
+    uint32_t advertiser_itvl_min;
+    /* Unit: 0.625ms */
+    uint32_t advertiser_itvl_max;
+
     bool scanner_enable;
     bool scanner_verbose;
     bool scanner_filter_empty;
+    /* Unit: 0.625ms */
+    uint32_t scanner_itvl;
+    /* Unit: 0.625ms */
+    uint32_t scanner_window;
+    /* Unit: 1.28s */
+    uint16_t scanner_period;
+    /* Unit: 10ms */
+    uint16_t scanner_duration;
+    bool scanner_filter_duplicates;
+    bool scanner_limited;
+
     filter_entry_t scanner_filter[JELLING_SCANNER_FILTER_SIZE];
     bool duplicate_detection_enable;
 } jelling_config_t;
@@ -126,6 +157,8 @@ typedef struct {
 int jelling_init(gnrc_netif_t *netif, gnrc_nettype_t nettype);
 void jelling_start(void);
 void jelling_stop(void);
+void jelling_restart_scanner(void);
+void jelling_restart_advertiser(void);
 
 int jelling_send(gnrc_pktsnip_t *pkt);
 

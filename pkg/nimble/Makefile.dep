@@ -91,6 +91,7 @@ endif
 
 ifneq (,$(filter nimble_jelling,$(USEMODULE)))
   FEATURES_REQUIRED += ble_nimble_netif
+  USEMODULE += xtimer
   USEMODULE += l2util
   USEMODULE += bluetil_addr
   ifneq (,$(filter gnrc_ipv6_%,$(USEMODULE)))

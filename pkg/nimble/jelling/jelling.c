@@ -5,6 +5,7 @@
 #include "thread.h"
 #include "thread_flags.h"
 #include "mutex.h"
+#include "xtimer.h"
 
 #include "net/ble.h"
 #include "net/bluetil/addr.h"
@@ -161,8 +162,8 @@ static int _send_pkt(struct os_mbuf *mbuf)
         return res;
     }
 
-    res = ble_gap_ext_adv_start(instance, JELLING_ADVERTISING_DURATION,
-                            JELLING_ADVERTISING_EVENTS);
+    res = ble_gap_ext_adv_start(instance, _config.advertiser_duration,
+                            _config.advertiser_max_events);
     if (res) {
         printf("Couldn't start advertising. Return code: 0x%02X\n", res);
         return -1;
@@ -176,15 +177,15 @@ static int _send_pkt(struct os_mbuf *mbuf)
 
 static int _start_scanner(void) {
     struct ble_gap_ext_disc_params uncoded = {0};
-    uint8_t limited = 0;
-    uint8_t filter_duplicates = 1;
-    uint16_t duration = JELLING_SCANNER_DURATION;
-    uint16_t period = JELLING_SCANNER_PERIOD;
+    uint8_t limited = _config.scanner_limited;
+    uint8_t filter_duplicates = _config.scanner_filter_duplicates;
+    uint16_t duration = _config.scanner_duration;
+    uint16_t period = _config.scanner_period;
 
     /* Set uncoded parameters */
     uncoded.passive = 1;
-    uncoded.itvl = JELLING_SCANNER_ITVL;
-    uncoded.window = JELLING_SCANNER_WINDOW;
+    uncoded.itvl = _config.scanner_itvl;
+    uncoded.window = _config.scanner_window;
 
     /* start scan */
     int rc = ble_gap_ext_disc(nimble_riot_own_addr_type, duration, period, filter_duplicates,
@@ -231,6 +232,7 @@ static size_t _prepare_ipv6_packet(uint8_t *data, size_t len)
     bool first = true;
     while (pos < len) {
         len_data_type = data[pos];
+        /* sanity check */
         if (len_data_type+pos > len || len_data_type+pos_ipv6 > len) {
             goto error;
         }
@@ -316,13 +318,13 @@ static void _on_data(struct ble_gap_event *event, void *arg)
         } else { printf("Unknown packet\n"); }
     }
 
-    /* TRUNCATED status -> (if) recv of chained packet failed */
+    /* TRUNCATED status -> recv of chained packet failed */
     if (event->ext_disc.data_status == BLE_GAP_EXT_ADV_DATA_STATUS_TRUNCATED) {
         _chain.ongoing = false;
         return;
     }
 
-    /* No chained packet ongoing -> needs to be the first packet containing
+    /* No chained packets ongoing -> needs to be the first packet containing
        the jelling header */
     if (!_chain.ongoing) {
        _chain.next_hop_match = _filter_next_hop_addr((uint8_t *)event->ext_disc.data+PACKET_NEXT_HOP_OFFSET,
@@ -331,6 +333,7 @@ static void _on_data(struct ble_gap_event *event, void *arg)
             return;
         }
 
+        /* duplicate detection */
         if (IS_ACTIVE(JELLING_DUPLICATE_DETECTION_FEATURE_ENABLE)) {
             if (_config.duplicate_detection_enable) {
                 uint8_t num;
@@ -343,19 +346,22 @@ static void _on_data(struct ble_gap_event *event, void *arg)
         }
 
         _chain.len = 0;
-        /* incomplete event, copy data into buffer and prepare for more data  */
+        /* incomplete event, prepare for more data  */
         if (event->ext_disc.data_status == BLE_GAP_EXT_ADV_DATA_STATUS_INCOMPLETE) {
             _chain.ongoing = true;
         }
+        /* copy data into buffer */
         memcpy(_chain.data, event->ext_disc.data, event->ext_disc.length_data);
         _chain.len = event->ext_disc.length_data;
 
-    } else {
+    } else { /* subsequent packet without jelling header */
+        /* sanity check */
         if (_chain.len+event->ext_disc.length_data > sizeof(_chain.data)) {
             printf("Broken packets from nimBLE\n");
             _chain.ongoing = false;
             return;
         }
+        /* copy data into buffer */
         memcpy(_chain.data+_chain.len, event->ext_disc.data,
                event->ext_disc.length_data);
         _chain.len += event->ext_disc.length_data;
@@ -448,8 +454,8 @@ static int _configure_adv_instance(uint8_t instance) {
     params.own_addr_type = nimble_riot_own_addr_type;
     params.channel_map = BLE_GAP_ADV_DFLT_CHANNEL_MAP;
     params.filter_policy = 0;
-    params.itvl_min = BLE_GAP_ADV_FAST_INTERVAL1_MIN;
-    params.itvl_max = 400;
+    params.itvl_min = _config.advertiser_itvl_min;
+    params.itvl_max = _config.advertiser_itvl_max;
     params.tx_power = 127;
     params.primary_phy = BLE_HCI_LE_PHY_1M;
     params.secondary_phy = BLE_HCI_LE_PHY_1M;
@@ -491,7 +497,7 @@ void jelling_start(void)
     }
     mutex_unlock(&_instance_status_lock);
 
-    if(_config.scanner_enable) {
+    if(_config.scanner_enable && ble_gap_disc_active() == 0) {
         _start_scanner();
     }
     _jelling_status = JELLING_RUNNING;
@@ -501,14 +507,17 @@ void jelling_stop(void)
 {
     int rc;
     mutex_lock(&_instance_status_lock);
+    bool wait = false;
     for (int i=0; i < ADV_INSTANCES; i++) {
-        rc = ble_gap_ext_adv_stop(i);
-        if (rc && rc != 0x02)
-        {
-            printf("failed to stop advertising instance %d. But it will stop "
-            "after it completes its events. Return code: 0x%02X\n", i, rc);
-        }
         _instance_status[i] = STOPPED;
+        rc = ble_gap_ext_adv_stop(i);
+        if (rc != 0 && rc != BLE_HS_EALREADY) {
+            wait = true;
+        }
+    }
+    if (wait) {
+        printf("At least one advertising instace is busy. Sleeping three seconds...\n");
+        xtimer_sleep(3);
     }
     mutex_unlock(&_instance_status_lock);
     _jelling_status = JELLING_STOPPED;
@@ -638,8 +647,18 @@ void jelling_load_default_config(void)
     _config.advertiser_enable = JELLING_ADVERTISING_ENABLE_DFLT;
     _config.advertiser_verbose = JELLING_ADVERTISING_VERBOSE_DFLT;
     _config.advertiser_block_icmp = JELLING_ADVERTISING_BLOCK_ICMP_DFLT;
+    _config.advertiser_duration = JELLING_ADVERTISING_DURATION_DFLT;
+    _config.advertiser_max_events = JELLING_ADVERTISING_MAX_EVENTS_DFLT;
+    _config.advertiser_itvl_min = JELLING_ADVERTISING_ITVL_MIN_DFLT;
+    _config.advertiser_itvl_max = JELLING_ADVERTISING_ITVL_MAX_DFLT;
+
     _config.scanner_enable = JELLING_SCANNER_ENABLE_DFLT;
     _config.scanner_verbose = JELLING_SCANNER_VERBOSE_DFLT;
+    _config.scanner_itvl = JELLING_SCANNER_ITVL_DFLT;
+    _config.scanner_window = JELLING_SCANNER_WINDOW_DFLT;
+    _config.scanner_period = JELLING_SCANNER_PERIOD_DFLT;
+    _config.scanner_duration = JELLING_SCANNER_DURATION_DFLT;
+
     memcpy(_config.scanner_filter, 0, sizeof(_config.scanner_filter));
     for (int i=0; i < JELLING_SCANNER_FILTER_SIZE; i++) {
         _config.scanner_filter[i].empty = true;
@@ -654,41 +673,74 @@ jelling_config_t *jelling_get_config(void) {
     return &_config;
 }
 
+void jelling_restart_advertiser(void) {
+    jelling_stop();
+    /* reconfigure instances */
+    int res;
+    for (int i = 0; i < ADV_INSTANCES; i++) {
+        res = _configure_adv_instance(i);
+        if (res < 0) {
+            _jelling_status = JELLING_INIT_ERROR;
+            break;
+        }
+        _instance_status[i] = STOPPED;
+    }
+    jelling_start();
+}
+
+void jelling_restart_scanner(void) {
+    ble_gap_disc_cancel();
+    if (_config.scanner_enable) {
+        _start_scanner();
+    }
+}
+
 void jelling_print_config(void) {
     printf("--- Jelling configuration  ---\n");
 
+    printf("Advertiser:\n");
     if (_config.advertiser_enable) {
-        printf("Advertiser: enabled\n");
-    } else { printf("Advertiser: disabled\n"); }
+        printf("    Enabled: true\n");
+    } else { printf("    Enabled: false\n"); }
     if (_config.advertiser_verbose) {
-        printf("Advertiser: verbose\n");
-    } else { printf("Advertiser: not verbose\n"); }
+        printf("    Verbose: true\n");
+    } else { printf("    Verbose: false\n"); }
     if (_config.advertiser_block_icmp) {
-        printf("Advertiser: ICMP packets blocked\n");
-    } else { printf("Advertiser: ICMP packets not blocked\n"); }
+        printf("     ICMP packets blocked: true\n");
+    } else { printf("    ICMP packets blocked: false\n"); }
+    printf("    Max events: %d \n", _config.advertiser_max_events);
+    printf("    Duration: %d (Unit: 10ms)\n", _config.advertiser_duration);
+    printf("    Itvl min: %ld (Unit: 0.625ms)\n", _config.advertiser_itvl_min);
+    printf("    Itvl max: %ld (Unit: 0.625ms)\n", _config.advertiser_itvl_max);
 
-
+    printf("Scanner:\n");
     if (_config.scanner_enable) {
-        printf("Scanner: enabled\n");
-    } else { printf("Scanner: disabled\n"); }
+        printf("    Enabled: true\n");
+    } else { printf("    Enabled: false\n"); }
+    if (IS_ACTIVE(JELLING_DUPLICATE_DETECTION_FEATURE_ENABLE)) {
+        if (_config.duplicate_detection_enable) {
+            printf("    Duplicate detection: enabled\n");
+        } else { printf("   Duplicate etection: disabled\n"); }
+    }
     if (_config.scanner_verbose) {
-        printf("Scanner: verbose\n");
-    } else { printf("Scanner: not verbose\n"); }
+        printf("    Verbose: true\n");
+    } else { printf("    Verbose: false\n"); }
+    printf("    Duration: %d (Unit 10ms)\n", _config.scanner_duration);
+    printf("    Period: %d (Unit 1.28s)\n", _config.scanner_period);
+    printf("    Itvl: %ld (Unit 0.625ms)\n", _config.scanner_itvl);
+    printf("    Window: %ld (Unit 0.625ms)\n", _config.scanner_window);
+
     bool empty = true;
+    printf("    Filter: ");
     for (int i=0; i < JELLING_SCANNER_FILTER_SIZE; i++) {
         if (!_config.scanner_filter[i].empty) {
-            printf("Filter: ");
+            printf("\n");
+            printf("        Node: ");
             bluetil_addr_print(_config.scanner_filter[i].addr);
-            puts("");
             empty = false;
         }
     }
     if (empty) {
-        printf("Scanner: no address in filter\n");
-    }
-    if (IS_ACTIVE(JELLING_DUPLICATE_DETECTION_FEATURE_ENABLE)) {
-        if (_config.duplicate_detection_enable) {
-            printf("Duplicate detection: enabled\n");
-        } else { printf("Duplicate etection: disabled\n"); }
-    }
+        printf("no address in filter\n");
+    } else { puts(""); }
 }
