@@ -4,9 +4,9 @@ size_t _write_hdr(uint8_t *data, uint8_t *next_hop, uint8_t pkt_num, bool write_
 
 int jelling_fragment_into_mbuf(gnrc_pktsnip_t *pkt, struct os_mbuf *mbuf,
                                 uint8_t *next_hop, uint8_t pkt_num) {
-    uint8_t data[JELLING_FRAGMENTATION_FRAGMENT_BUF_SIZE];
+    uint8_t data[JELLING_FRAGMENT_SIZE];
     size_t len = 0;
-    uint8_t max_len = JELLING_FIRST_FRAGMENT_SIZE;
+    uint8_t max_len = JELLING_FRAGMENT_SIZE;
     int res;
 
     if (IS_ACTIVE(JELLING_DEBUG_FRAGMENTATION)) {
@@ -47,7 +47,6 @@ int jelling_fragment_into_mbuf(gnrc_pktsnip_t *pkt, struct os_mbuf *mbuf,
                         (pkt->next != NULL && pkt->next->size != 0)) {
                     pkt_num++;
                     len = _write_hdr(data, next_hop, pkt_num, false);
-                    max_len = JELLING_SUBSEQUENT_FRAGMENT_SIZE;
                 }
             }
         }

@@ -9,16 +9,8 @@
 #include "host/ble_hs_adv.h"
 #include "host/util/util.h"
 
-#ifndef JELLING_FRAGMENTATION_FRAGMENT_BUF_SIZE
-#define JELLING_FRAGMENTATION_FRAGMENT_BUF_SIZE         255
-#endif
-
-#ifndef JELLING_FIRST_FRAGMENT_SIZE
-#define JELLING_FIRST_FRAGMENT_SIZE                     228
-#endif
-
-#ifndef JELLING_SUBSEQUENT_FRAGMENT_SIZE
-#define JELLING_SUBSEQUENT_FRAGMENT_SIZE                228
+#ifndef JELLING_FRAGMENT_SIZE
+#define JELLING_FRAGMENT_SIZE           255
 #endif
 
 int jelling_fragment_into_mbuf(gnrc_pktsnip_t *pkt, struct os_mbuf *mbuf,
