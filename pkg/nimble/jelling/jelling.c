@@ -316,6 +316,12 @@ static void _on_data(struct ble_gap_event *event, void *arg)
         } else { printf("Unknown packet\n"); }
     }
 
+    /* TRUNCATED status -> (if) recv of chained packet failed */
+    if (event->ext_disc.data_status == BLE_GAP_EXT_ADV_DATA_STATUS_TRUNCATED) {
+        _chain.ongoing = false;
+        return;
+    }
+
     /* No chained packet ongoing -> needs to be the first packet containing
        the jelling header */
     if (!_chain.ongoing) {
