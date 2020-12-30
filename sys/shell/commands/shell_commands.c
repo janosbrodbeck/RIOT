@@ -335,7 +335,7 @@ const shell_command_t _shell_command_list[] = {
     { "ble", "Manage BLE connections for NimBLE", _nimble_netif_handler },
 #endif
 #ifdef MODULE_NIMBLE_JELLING
-     { "jelling", "Manage the BLE over IPv6 Advertising network", _nimble_jelling_handler },
+     { "ble", "Manage the BLE over IPv6 Advertising network", _nimble_jelling_handler },
 #endif
 #ifdef MODULE_NIMBLE_STATCONN
     { "statconn", "NimBLE netif statconn", _nimble_statconn_handler},
