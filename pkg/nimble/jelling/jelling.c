@@ -710,7 +710,7 @@ void jelling_print_config(void) {
         printf("    Verbose: true\n");
     } else { printf("    Verbose: false\n"); }
     if (_config.advertiser_block_icmp) {
-        printf("     ICMP packets blocked: true\n");
+        printf("    ICMP packets blocked: true\n");
     } else { printf("    ICMP packets blocked: false\n"); }
     printf("    Max events: %d \n", _config.advertiser_max_events);
     printf("    Duration: %d (Unit: 10ms)\n", _config.advertiser_duration);
