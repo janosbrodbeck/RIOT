@@ -10,7 +10,7 @@
 #include "host/util/util.h"
 
 #ifndef JELLING_FRAGMENT_SIZE
-#define JELLING_FRAGMENT_SIZE           255
+#define JELLING_FRAGMENT_SIZE           228
 #endif
 
 int jelling_fragment_into_mbuf(gnrc_pktsnip_t *pkt, struct os_mbuf *mbuf,

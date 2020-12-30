@@ -21,7 +21,6 @@
 #include "jelling_fragmentation.h"
 #include "jelling_duplicate_detection.h"
 
-
 #include "nimble_riot.h"
 #include "host/ble_gap.h"
 #include "host/ble_hs.h"
