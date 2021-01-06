@@ -76,6 +76,10 @@
 #define JELLING_SCANNER_FILTER_SIZE                     3
 #endif
 
+#ifndef JELLING_SCANNER_FILTER_DUPLICATES_DFLT
+#define JELLING_SCANNER_FILTER_DUPLICATES_DFLT          1
+#endif
+
 /**
  * @brief   Enable or disable duplicate detection. If disabled, the BLE controller
  *          still filters for duplicates! In crowded areas this system tries to

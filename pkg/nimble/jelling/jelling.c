@@ -662,6 +662,7 @@ void jelling_load_default_config(void)
     _config.scanner_window = JELLING_SCANNER_WINDOW_DFLT;
     _config.scanner_period = JELLING_SCANNER_PERIOD_DFLT;
     _config.scanner_duration = JELLING_SCANNER_DURATION_DFLT;
+    _config.scanner_filter_duplicates = JELLING_SCANNER_FILTER_DUPLICATES_DFLT;
 
     memcpy(_config.scanner_filter, 0, sizeof(_config.scanner_filter));
     for (int i=0; i < JELLING_SCANNER_FILTER_SIZE; i++) {
