@@ -273,6 +273,12 @@ error:
 
 static void _on_data(struct ble_gap_event *event, void *arg)
 {
+    /* TRUNCATED status -> recv of chained packet failed */
+    if (event->ext_disc.data_status == BLE_GAP_EXT_ADV_DATA_STATUS_TRUNCATED) {
+        _chain.ongoing = false;
+        return;
+    }
+
     /* if we have sth in our filter list */
     if (!_config.scanner_filter_empty) {
         bool match = false;
@@ -316,12 +322,6 @@ static void _on_data(struct ble_gap_event *event, void *arg)
         if (jelling_packet) {
             printf("Jelling packet\n");
         } else { printf("Unknown packet\n"); }
-    }
-
-    /* TRUNCATED status -> recv of chained packet failed */
-    if (event->ext_disc.data_status == BLE_GAP_EXT_ADV_DATA_STATUS_TRUNCATED) {
-        _chain.ongoing = false;
-        return;
     }
 
     /* No chained packets ongoing -> needs to be the first packet containing
