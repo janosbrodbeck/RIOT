@@ -242,8 +242,8 @@ static size_t _prepare_ipv6_packet(uint8_t *data, size_t len)
 
         if (first) {
             /* skip jelling header */
-            memcpy(data+pos_ipv6, data+pos+PACKET_DATA_OFFSET, len_data_type-PACKET_DATA_OFFSET);
-            pos_ipv6 += len_data_type-PACKET_DATA_OFFSET;
+            memcpy(data+pos_ipv6, data+pos+PACKET_DATA_OFFSET, len_data_type-PACKET_DATA_OFFSET+1);
+            pos_ipv6 += len_data_type-PACKET_DATA_OFFSET+1;
             first = false;
         } else {
             memcpy(data+pos_ipv6, data+pos+PACKET_NEXT_HOP_OFFSET+1, len_data_type-PACKET_NEXT_HOP_OFFSET);
@@ -376,7 +376,9 @@ static void _on_data(struct ble_gap_event *event, void *arg)
     /* Process BLE data */
     size_t ipv6_packet_size = _prepare_ipv6_packet(_chain.data, _chain.len);
     if (ipv6_packet_size == -1) {
-        printf("Broken BLE data\n");
+        if (IS_ACTIVE(JELLING_DEBUG_BROKEN_BLE_DATA_MSG)) {
+            printf("Broken BLE data\n");
+        }
         return;
     }
 
