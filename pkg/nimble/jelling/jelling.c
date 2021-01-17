@@ -577,6 +577,7 @@ void jelling_print_info(void)
     }
     puts("");
     printf("Advertising instances: %d\n", ADV_INSTANCES);
+    printf("Non-standard 6LoWPAN MTU allowed: %d\n", CONFIG_GNRC_NETIF_NONSTANDARD_6LO_MTU);
     printf("MTU: %d bytes\n", JELLING_MTU);
     printf("Jelling status: ");
     switch(_jelling_status) {

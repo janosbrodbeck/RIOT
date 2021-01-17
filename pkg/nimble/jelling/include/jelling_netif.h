@@ -38,7 +38,7 @@ extern "C" {
  * @brief   Reserved bytes for flags and headers
  */
 #ifndef JELLING_HDR_RESERVED
-#define JELLING_HDR_RESERVED    64
+#define JELLING_HDR_RESERVED    1650-JELLING_MTU
 #endif
 
 /**
