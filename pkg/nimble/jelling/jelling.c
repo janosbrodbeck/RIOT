@@ -50,7 +50,7 @@ typedef struct {
     bool ongoing;
     uint8_t pkt_num;
     uint8_t next_hop_match;
-    uint8_t data[JELLING_MTU];
+    uint8_t data[JELLING_MTU+JELLING_HDR_RESERVED];
     size_t len;
 } _chained_packet;
 
