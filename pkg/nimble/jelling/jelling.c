@@ -295,12 +295,15 @@ static void _on_data(struct ble_gap_event *event, void *arg)
             return;
         }
     }
-    bool jelling_packet = _filter_manufacturer_id((uint8_t *)event->ext_disc.data,
-                        event->ext_disc.length_data);
 
-    /* do not process any further if unknown packet */
-    if (!jelling_packet && !_chain.ongoing) {
-        return;
+    if (!_chain.ongoing) {
+        bool jelling_packet = _filter_manufacturer_id((uint8_t *)event->ext_disc.data,
+                            event->ext_disc.length_data);
+
+        /* do not process any further if unknown packet */
+        if (!jelling_packet) {
+            return;
+        }
     }
 
     /* print info */
@@ -319,9 +322,6 @@ static void _on_data(struct ble_gap_event *event, void *arg)
                 printf("TRUNCATED    ");
                 break;
         }
-        if (jelling_packet) {
-            printf("Jelling packet\n");
-        } else { printf("Unknown packet\n"); }
     }
 
     /* No chained packets ongoing -> needs to be the first packet containing
@@ -343,7 +343,6 @@ static void _on_data(struct ble_gap_event *event, void *arg)
             }
         }
 
-        _chain.len = 0;
         /* incomplete event, prepare for more data  */
         if (event->ext_disc.data_status == BLE_GAP_EXT_ADV_DATA_STATUS_INCOMPLETE) {
             _chain.ongoing = true;
