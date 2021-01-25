@@ -84,10 +84,12 @@ static int _netif_send(gnrc_netif_t *netif, gnrc_pktsnip_t *pkt)
     assert(pkt->type == GNRC_NETTYPE_NETIF);
     (void)netif;
 
-    jelling_send(pkt);
+    int res = jelling_send(pkt);
     gnrc_pktbuf_release(pkt);
-
-    return 0;
+    if (res == 0x03) {
+        res = -EBUSY;
+    }
+    return res;
 }
 
 /* not used, we pass incoming data to GNRC directly from the NimBLE thread */

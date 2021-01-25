@@ -54,7 +54,7 @@ typedef struct {
     size_t len;
 } _chained_packet;
 
-static int _send_pkt(struct os_mbuf *mbuf);
+static int _send_pkt(uint8_t instance, struct os_mbuf *mbuf);
 static int _start_scanner(void);
 static int _gap_event(struct ble_gap_event *event, void *arg);
 static void _on_data(struct ble_gap_event *event, void *arg);
@@ -99,6 +99,24 @@ int jelling_send(gnrc_pktsnip_t* pkt) {
         }
     }
 
+    uint8_t instance = -1;
+
+    /* find free advertising instace */
+    mutex_lock(&_instance_status_lock);
+    for (int i = 0; i < ADV_INSTANCES; i++) {
+        if (_instance_status[i] == IDLE) {
+            _instance_status[i] = ADVERTISING;
+            instance = i;
+            break;
+        }
+    }
+    mutex_unlock(&_instance_status_lock);
+
+    if (instance == -1) {
+        printf("Info: could not find idle advertising instance\n");
+        return -EBUSY;
+    }
+
     /* allocate mbuf */
     struct os_mbuf *buf = os_msys_get_pkthdr(JELLING_MTU+JELLING_HDR_RESERVED, 0);
     if (buf == NULL) {
@@ -121,44 +139,24 @@ int jelling_send(gnrc_pktsnip_t* pkt) {
 
     if (res < 0) {
         printf("jelling_send: fragmentation failed. Return code: %02X\n", res);
-        os_mbuf_free_chain(buf);
-        return -1;
+        goto exit;
     }
 
     if(IS_ACTIVE(JELLING_DEBUG_IPV6_PACKET_SIZES)) {
         printf("Sending IPv6 packet of %d bytes\n", gnrc_pkt_len(pkt)-pkt->size);
     }
 
-    _send_pkt(buf);
+    res = _send_pkt(instance, buf);
 
 exit:
     os_mbuf_free_chain(buf);
-    return 0;
+    return res;
 }
 
-static int _send_pkt(struct os_mbuf *mbuf)
+static int _send_pkt(uint8_t instance, struct os_mbuf *mbuf)
 {
-    int res;
-    uint8_t instance = -1;
-
-    /* find free advertising instace */
-    mutex_lock(&_instance_status_lock);
-    for (int i = 0; i < ADV_INSTANCES; i++) {
-        if (_instance_status[i] == IDLE) {
-            _instance_status[i] = ADVERTISING;
-            instance = i;
-            break;
-        }
-    }
-    mutex_unlock(&_instance_status_lock);
-
-    if (instance == -1) {
-        printf("Info: could not find idle advertising instance. Skipping packet\n");
-        return -1;
-    }
-    res = ble_gap_ext_adv_set_data(instance, mbuf);
+    int res = ble_gap_ext_adv_set_data(instance, mbuf);
     if (res) {
-        printf("Could not set advertising data: 0x%02X\n", res);
         return res;
     }
 
@@ -407,7 +405,6 @@ static void _on_data(struct ble_gap_event *event, void *arg)
     gnrc_netif_hdr_set_netif(if_snip->data, _netif);
 
     /* allocate space in the pktbuf to store the packet */
-    //size_t data_size = _chain.len-PACKET_DATA_OFFSET;
     gnrc_pktsnip_t *payload = gnrc_pktbuf_add(if_snip, NULL, ipv6_packet_size,
                                 _nettype);
     if (payload == NULL) {
