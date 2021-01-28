@@ -379,13 +379,18 @@ ssize_t sock_dtls_send_aux(sock_dtls_t *sock, sock_dtls_session_t *remote,
     assert(data);
 
     /* check if session exists, if not create session first then send */
-    if (!dtls_get_peer(sock->dtls_ctx, &remote->dtls_session)) {
+    dtls_peer_t *peer = dtls_get_peer(sock->dtls_ctx, &remote->dtls_session);
+    if (!peer || peer->state != DTLS_STATE_CONNECTED) {
         if (timeout == 0) {
             return -ENOTCONN;
         }
 
+        if (peer) {
+            dtls_reset_peer(sock->dtls_ctx, peer);
+        }
+
         /* no session with remote, creating new session.
-         * This will also create new peer for this session */
+        * This will also create new peer for this session */
         res = dtls_connect(sock->dtls_ctx, &remote->dtls_session);
         if (res < 0) {
             DEBUG("sock_dtls: error initiating handshake\n");
