@@ -384,6 +384,9 @@
 #include "event/timeout.h"
 #include "net/ipv6/addr.h"
 #include "net/sock/udp.h"
+#if IS_ACTIVE(CONFIG_GCOAP_ENABLE_DTLS)
+#include "net/sock/dtls.h"
+#endif
 #include "net/nanocoap.h"
 #include "xtimer.h"
 
@@ -400,8 +403,42 @@ extern "C" {
 /**
  * @brief   Server port; use RFC 7252 default if not defined
  */
-#ifndef CONFIG_GCOAP_PORT
+#if IS_ACTIVE(CONFIG_GCOAP_ENABLE_DTLS)
+#define CONFIG_GCOAP_PORT              (5684)
+#else
 #define CONFIG_GCOAP_PORT              (5683)
+#endif
+
+/**
+ * @brief   DTLS credential tag to determine, which credential to use for
+ *          authentication.
+ */
+#ifndef CONFIG_GCOAP_DTLS_CREDENTIAL_TAG
+#define CONFIG_GCOAP_DTLS_CREDENTIAL_TAG    (5)
+#endif
+
+/**
+ * @brief   Timeout for the DTLS handshake process. Set to 0 for infinite time
+ */
+#ifndef CONFIG_GCOAP_DTLS_HANDSHAKE_TIMEOUT_USEC
+#define CONFIG_GCOAP_DTLS_HANDSHAKE_TIMEOUT_USEC    (3 * US_PER_SEC)
+#endif
+
+/**
+ * @brief   Number of minimum free sessions. If the count of free
+ *          sessions falls below this threshold, oldest used sessions will be
+ *          closed after a timeout time. Set to 0 to deactivate this feature.
+ */
+#ifndef CONFIG_GCOAP_DTLS_MINIMUM_AVAILABLE_SESSIONS
+#define CONFIG_GCOAP_DTLS_MINIMUM_AVAILABLE_SESSIONS  (1)
+#endif
+
+/**
+ * @brief   Timeout for freeing up a session when minimum number of free
+ *          sessions is not given.
+ */
+#ifndef CONFIG_GCOAP_DTLS_MINIMUM_AVAILABLE_SESSIONS_TIMEOUT_USEC
+#define CONFIG_GCOAP_DTLS_MINIMUM_AVAILABLE_SESSIONS_TIMEOUT_USEC  (15 * US_PER_SEC)
 #endif
 
 /**
@@ -567,8 +604,13 @@ extern "C" {
  * @brief Stack size for module thread
  */
 #ifndef GCOAP_STACK_SIZE
+#if IS_ACTIVE(CONFIG_GCOAP_ENABLE_DTLS)
+#define GCOAP_STACK_SIZE (2*THREAD_STACKSIZE_DEFAULT + DEBUG_EXTRA_STACKSIZE \
+                          + sizeof(coap_pkt_t))
+#else
 #define GCOAP_STACK_SIZE (THREAD_STACKSIZE_DEFAULT + DEBUG_EXTRA_STACKSIZE \
                           + sizeof(coap_pkt_t))
+#endif
 #endif
 
 /**
@@ -586,6 +628,32 @@ extern "C" {
  */
 #define COAP_LINK_FLAG_INIT_RESLIST  (1)  /**< initialize as for first resource
                                            *   in a list */
+
+/**
+ * @brief   Coap socket types
+ */
+typedef enum {
+    COAP_SOCKET_TYPE_UNDEF = 0,
+    COAP_SOCKET_TYPE_UDP,
+    COAP_SOCKET_TYPE_DTLS
+} coap_socket_type_t;
+
+/**
+ * @brief   Coap socket to handle different transport types
+ */
+typedef struct {
+    coap_socket_type_t type;
+    union {
+        sock_udp_t *udp;
+#if IS_ACTIVE(CONFIG_GCOAP_ENABLE_DTLS)
+        sock_dtls_t *dtls;
+#endif
+    } socket;
+#if IS_ACTIVE(CONFIG_GCOAP_ENABLE_DTLS)
+    sock_dtls_session_t ctx_dtls_session;
+#endif
+} coap_socket_t;
+
 /** @} */
 
 /**
