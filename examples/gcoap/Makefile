@@ -27,6 +27,13 @@ USEMODULE += shell
 USEMODULE += shell_commands
 USEMODULE += ps
 
+# Required by DTLS. Currently, only tinyDTLS is supported by GNRC.
+USEMODULE += gcoap_dtls
+USEPKG += tinydtls
+USEMODULE += tinydtls_sock_dtls
+# tinydtls needs crypto secure PRNG
+USEMODULE += prng_sha1prng
+
 # Comment this out to disable code in RIOT that does safety checking
 # which is not needed in a production environment but helps in the
 # development process:
@@ -36,6 +43,16 @@ DEVELHELP ?= 1
 QUIET ?= 1
 
 include $(RIOTBASE)/Makefile.include
+
+# Enables DTLS-secured CoAP messaging
+GCOAP_ENABLE_DTLS ?= 0
+ifeq (1,$(GCOAP_ENABLE_DTLS))
+	CFLAGS += -DCONFIG_GCOAP_ENABLE_DTLS=1
+	CFLAGS += -DDTLS_PEER_MAX=1
+
+	# increase main stack
+	CFLAGS += -DTHREAD_STACKSIZE_MAIN=2*THREAD_STACKSIZE_DEFAULT
+endif
 
 # For now this goes after the inclusion of Makefile.include so Kconfig symbols
 # are available. Only set configuration via CFLAGS if Kconfig is not being used
