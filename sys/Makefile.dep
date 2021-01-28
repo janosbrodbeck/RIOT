@@ -892,6 +892,15 @@ ifneq (,$(filter l2filter_%,$(USEMODULE)))
   USEMODULE += l2filter
 endif
 
+ifneq (,$(filter gcoap_dtls,$(USEMODULE)))
+  USEMODULE += gcoap
+  USEMODULE += dsm
+  USEMODULE += sock_async_event
+  USEMODULE += sock_dtls
+  USEMODULE += event_thread_medium
+  USEMODULE += event_timeout
+endif
+
 ifneq (,$(filter gcoap,$(USEMODULE)))
   USEMODULE += nanocoap
   USEMODULE += sock_async_event

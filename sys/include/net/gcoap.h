@@ -400,8 +400,32 @@ extern "C" {
 /**
  * @brief   Server port; use RFC 7252 default if not defined
  */
-#ifndef CONFIG_GCOAP_PORT
+#if IS_ACTIVE(CONFIG_GCOAP_ENABLE_DTLS)
+#define CONFIG_GCOAP_PORT              (5684)
+#else
 #define CONFIG_GCOAP_PORT              (5683)
+#endif
+
+/**
+ * @brief   Timeout for the DTLS handshake process. Set to 0 for infinite time
+ */
+#ifndef CONFIG_GCOAP_DTLS_HANDSHAKE_SEND_TIMEOUT_USEC
+#define CONFIG_GCOAP_DTLS_HANDSHAKE_SEND_TIMEOUT_USEC    (4 * US_PER_SEC)
+#endif
+
+/**
+ * @brief   Number of minimum free sessions
+ */
+#ifndef CONFIG_GCOAP_DTLS_FREE_UP_MINIMUM_SESSIONS
+#define CONFIG_GCOAP_DTLS_FREE_UP_MINIMUM_SESSIONS  (1)
+#endif
+
+/**
+ * @brief   Timeout for freeing up a session when minimum number of free
+ *          sessions is not given.
+ */
+#ifndef CONFIG_GCOAP_DTLS_FREE_UP_SESSION_TIMEOUT_USEC
+#define CONFIG_GCOAP_DTLS_FREE_UP_SESSION_TIMEOUT_USEC  (15 * US_PER_SEC)
 #endif
 
 /**
@@ -567,8 +591,13 @@ extern "C" {
  * @brief Stack size for module thread
  */
 #ifndef GCOAP_STACK_SIZE
+#if IS_ACTIVE(CONFIG_GCOAP_ENABLE_DTLS)
+#define GCOAP_STACK_SIZE (2*THREAD_STACKSIZE_DEFAULT + DEBUG_EXTRA_STACKSIZE \
+                          + sizeof(coap_pkt_t))
+#else
 #define GCOAP_STACK_SIZE (THREAD_STACKSIZE_DEFAULT + DEBUG_EXTRA_STACKSIZE \
                           + sizeof(coap_pkt_t))
+#endif
 #endif
 
 /**
