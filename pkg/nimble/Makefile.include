@@ -117,10 +117,10 @@ ifneq (,$(filter nimble_jelling,$(USEMODULE)))
   CFLAGS += -DNIMBLE_HOST_PRIO="(NIMBLE_CONTROLLER_PRIO + 1)"
 
   # configure NimBLE's internals
-  CFLAGS += -DMYNEWT_VAL_MSYS_1_BLOCK_SIZE=1800
+  CFLAGS += -DMYNEWT_VAL_MSYS_1_BLOCK_SIZE=294
   # NimBLEs internal buffer need to hold one IPv6 MTU per connection
   # for the internal MTU of 256 byte, we need 10 mbufs per connection...
-  CFLAGS += -DMYNEWT_VAL_MSYS_1_BLOCK_COUNT=15
+  CFLAGS += -DMYNEWT_VAL_MSYS_1_BLOCK_COUNT=32
 
   # Activate BLE extended advertisings
   CFLAGS += -DMYNEWT_VAL_BLE_EXT_ADV=1
