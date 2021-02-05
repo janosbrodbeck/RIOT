@@ -146,7 +146,9 @@ int jelling_send(gnrc_pktsnip_t* pkt) {
         printf("Sending IPv6 packet of %d bytes\n", gnrc_pkt_len(pkt)-pkt->size);
     }
 
+    /* note: ble_gap_ext_adv_set_data already calls os_mbuf_free_chain! */
     res = _send_pkt(instance, buf);
+    return res;
 
 exit:
     os_mbuf_free_chain(buf);
@@ -574,6 +576,11 @@ void jelling_print_info(void)
         bluetil_addr_ipv6_l2ll_print(_ble_addr);
     }
     puts("");
+
+    printf("Own Address (live): ");
+    bluetil_addr_print(own_addr);
+    puts("");
+
     printf("Advertising instances: %d\n", ADV_INSTANCES);
     printf("Non-standard 6LoWPAN MTU allowed: %d\n", CONFIG_GNRC_NETIF_NONSTANDARD_6LO_MTU);
     printf("MTU: %d bytes\n", JELLING_MTU);
@@ -606,6 +613,9 @@ void jelling_print_info(void)
                 break;
         }
     }
+
+    printf("MSYS_SIZE: %d\n", MYNEWT_VAL(MSYS_1_BLOCK_SIZE));
+    printf("MSYS_COUNT: %d\n", MYNEWT_VAL(MSYS_1_BLOCK_COUNT));
 }
 
 int jelling_filter_add(char *addr)
