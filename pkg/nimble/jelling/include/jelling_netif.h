@@ -31,14 +31,14 @@ extern "C" {
 /* NOTE: We do not use the @ref IPV6_MIN_MTU define here, as the iov6.h header
          pulls in some other RIOT headers that clash with NimBLE header (e.g.
  *       byteorder.h vs. endian.h) */
-#ifndef JELLING_MTU
-#define JELLING_MTU             1280
+#ifndef JELLING_IPV6_MTU
+#define JELLING_IPV6_MTU             1280
 #endif
 /**
  * @brief   Reserved bytes for flags and headers
  */
 #ifndef JELLING_HDR_RESERVED
-#define JELLING_HDR_RESERVED    1650-JELLING_MTU
+#define JELLING_HDR_RESERVED    MYNEWT_VAL_BLE_EXT_ADV_MAX_SIZE
 #endif
 
 /**

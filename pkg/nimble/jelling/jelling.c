@@ -50,7 +50,7 @@ typedef struct {
     bool ongoing;
     uint8_t pkt_num;
     uint8_t next_hop_match;
-    uint8_t data[JELLING_MTU+JELLING_HDR_RESERVED];
+    uint8_t data[JELLING_HDR_RESERVED];
     size_t len;
 } _chained_packet;
 
@@ -118,7 +118,7 @@ int jelling_send(gnrc_pktsnip_t* pkt) {
     }
 
     /* allocate mbuf */
-    struct os_mbuf *buf = os_msys_get_pkthdr(JELLING_MTU+JELLING_HDR_RESERVED, 0);
+    struct os_mbuf *buf = os_msys_get_pkthdr(JELLING_HDR_RESERVED, 0);
     if (buf == NULL) {
         return -ENOBUFS;
     }
@@ -583,7 +583,10 @@ void jelling_print_info(void)
 
     printf("Advertising instances: %d\n", ADV_INSTANCES);
     printf("Non-standard 6LoWPAN MTU allowed: %d\n", CONFIG_GNRC_NETIF_NONSTANDARD_6LO_MTU);
-    printf("MTU: %d bytes\n", JELLING_MTU);
+    printf("IPv6 MTU: %d bytes\n", JELLING_IPV6_MTU);
+    printf("BLE maximum PDU: %d bytes\n", MYNEWT_VAL_BLE_EXT_ADV_MAX_SIZE);
+    printf("MSYS_BLOCK_SIZE: %d\n", MYNEWT_VAL(MSYS_1_BLOCK_SIZE));
+    printf("MSYS_BLOCK_COUNT: %d\n", MYNEWT_VAL(MSYS_1_BLOCK_COUNT));
     printf("Jelling status: ");
     switch(_jelling_status) {
         case JELLING_INIT_ERROR:
@@ -613,9 +616,6 @@ void jelling_print_info(void)
                 break;
         }
     }
-
-    printf("MSYS_SIZE: %d\n", MYNEWT_VAL(MSYS_1_BLOCK_SIZE));
-    printf("MSYS_COUNT: %d\n", MYNEWT_VAL(MSYS_1_BLOCK_COUNT));
 }
 
 int jelling_filter_add(char *addr)

@@ -53,7 +53,7 @@ static void _netif_init(gnrc_netif_t *netif)
 #if IS_USED(MODULE_GNRC_NETIF_6LO)
     /* we enable fragmentation for this device, as the 6LoWPAN takes care of
      * of this */
-    _netif.sixlo.max_frag_size = JELLING_MTU;
+    _netif.sixlo.max_frag_size = JELLING_IPV6_MTU;
 #endif
 }
 
@@ -120,7 +120,7 @@ static inline int _netdev_get(netdev_t *dev, netopt_t opt,
             break;
         case NETOPT_MAX_PDU_SIZE:
             assert(max_len >= sizeof(uint16_t));
-            *((uint16_t *)value) = JELLING_MTU;
+            *((uint16_t *)value) = JELLING_IPV6_MTU;
             res = sizeof(uint16_t);
             break;
         case NETOPT_PROTO:
