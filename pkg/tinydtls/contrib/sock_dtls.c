@@ -412,7 +412,9 @@ ssize_t sock_dtls_send_aux(sock_dtls_t *sock, sock_dtls_session_t *remote,
                 /* deletes peer created in dtls_connect() before */
                 dtls_peer_t *peer = dtls_get_peer(sock->dtls_ctx,
                                                   &remote->dtls_session);
-                dtls_reset_peer(sock->dtls_ctx, peer);
+                if (peer) {
+                    dtls_reset_peer(sock->dtls_ctx, peer);
+                }
                 return -ETIMEDOUT;
             }
         }
