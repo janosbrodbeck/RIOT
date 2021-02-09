@@ -92,14 +92,12 @@
 #define JELLING_DUPLICATE_DETECTION_FEATURE_ENABLE              0
 #endif
 
-#if JELLING_DUPLICATE_DETECTION_FEATURE_ENABLE
 /**
  *  @brief  Default value whether duplicate detection should be automatically
  *          activated
  */
 #ifndef JELLING_DUPLICATE_DETECTION_ACTIVATION_DFTL
 #define JELLING_DUPLICATE_DETECTION_ACTIVATION_DFTL     0
-#endif
 #endif
 
 /**
