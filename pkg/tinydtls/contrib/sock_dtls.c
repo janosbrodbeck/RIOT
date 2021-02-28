@@ -486,6 +486,11 @@ int sock_dtls_session_init(sock_dtls_t *sock, const sock_udp_ep_t *ep,
     /* prepare the remote party to connect to */
     _ep_to_session(ep, &remote->dtls_session);
 
+    dtls_peer_t *peer = dtls_get_peer(sock->dtls_ctx, &remote->dtls_session);
+    if (peer) {
+        dtls_reset_peer(sock->dtls_ctx, peer);
+    }
+
     /* start the handshake */
     int res = dtls_connect(sock->dtls_ctx, &remote->dtls_session);
     if (res < 0) {
