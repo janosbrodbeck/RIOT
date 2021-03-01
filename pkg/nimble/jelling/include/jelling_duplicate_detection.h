@@ -11,7 +11,9 @@
  *          environments.
  *          (Disable DD if the BLE controller duplicate filter is sufficient)
  */
+#ifndef JELLING_DUPLICATE_DETECTION_ENTRY_COUNT
 #define JELLING_DUPLICATE_DETECTION_ENTRY_COUNT         10
+#endif
 
 typedef struct  {
     uint8_t addr[BLE_ADDR_LEN];
