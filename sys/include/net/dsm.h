@@ -68,7 +68,7 @@ void dsm_init(void);
  *                          when an already established session is found
  *
  * @return Previous state of the session. If no session existed before it returns
- *         NO_SESSION. If no space is available it returns NO_SPACE.
+ *         SESSION_STATE_NONE. If no space is available it returns NO_SPACE.
  */
 dsm_state_t dsm_store(sock_dtls_t *sock, sock_dtls_session_t *session,
                       dsm_state_t new_state, bool restore);
