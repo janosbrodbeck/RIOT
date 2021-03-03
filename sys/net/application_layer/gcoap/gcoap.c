@@ -193,25 +193,23 @@ static void _on_sock_dtls_evt(sock_dtls_t *sock, sock_async_flags_t type, void *
             sock_dtls_session_destroy(sock, &socket.ctx_dtls_session);
             return;
         }
-        /* If session has been previously stored and the state was HANDSHAKE_ONGOING
-        before, the handshake has been initiated internally and another thread
-        is waiting for the handshake.   */
         dsm_state_t prev_state = dsm_store(sock, &socket.ctx_dtls_session,
                                            SESSION_STATE_ESTABLISHED, false);
-        if (res) {
-            /* Send message to the waiting sending thread to inform about
-               established session */
-            if (prev_state == SESSION_STATE_HANDSHAKE) {
-                msg_t msg = { .type = DTLS_EVENT_CONNECTED };
-                msg_send(&msg, _auth_waiting_thread);
-            }
-        } else {
+
+        /* If session is already stored and the state was SESSION_STATE_HANDSHAKE
+        before, the handshake has been initiated internally by a gcoap client request
+        and another thread is waiting for the handshake. Send message to the
+        waiting thread to inform about established session */
+        if (prev_state == SESSION_STATE_HANDSHAKE) {
+            msg_t msg = { .type = DTLS_EVENT_CONNECTED };
+            msg_send(&msg, _auth_waiting_thread);
+        } else if (prev_state == NO_SPACE) {
             /* No space in session management. Should not happen. If it occurs,
             we lost track of sessions stored in tinydtls internally */
             sock_dtls_session_destroy(sock, &socket.ctx_dtls_session);
         }
 
-        /* If no session slot is left: set timeout to free up session */
+        /* If not enough session slots left: set timeout to free up session */
         uint8_t minimum_free = CONFIG_GCOAP_DTLS_MINIMUM_AVAILABLE_SESSIONS;
         if (dsm_get_num_available_slots() < minimum_free)
         {
@@ -235,7 +233,7 @@ static void _on_sock_dtls_evt(sock_dtls_t *sock, sock_async_flags_t type, void *
         sock_udp_ep_t ep;
         sock_dtls_session_get_udp_ep(&socket.ctx_dtls_session, &ep);
 
-        /* Remove all memos of the concerned session */
+        /* Remove all memos of the concerned session. TODO: oberservable memos! */
         for (int i = 0; i < CONFIG_GCOAP_REQ_WAITING_MAX; i++) {
             if (_coap_state.open_reqs[i].state == GCOAP_MEMO_UNUSED) {
                 continue;
@@ -263,7 +261,7 @@ static void _on_sock_dtls_evt(sock_dtls_t *sock, sock_async_flags_t type, void *
 #endif
 
 #if IS_ACTIVE(CONFIG_GCOAP_ENABLE_DTLS)
-/* Timeout function to free up a session when all session slots are occupied */
+/* Timeout function to free up a session when too many session slots are occupied */
 static void _dtls_free_up_session(void *arg) {
     (void)arg;
     sock_dtls_session_t session;

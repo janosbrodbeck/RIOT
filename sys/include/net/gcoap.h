@@ -425,8 +425,8 @@ extern "C" {
 #endif
 
 /**
- * @brief   Number of minimum free sessions. If the count of free
- *          sessions falls below this threshold, oldest used sessions will be
+ * @brief   Number of minimum available sessions. If the count of available
+ *          sessions falls below this threshold, the oldest used session will be
  *          closed after a timeout time. Set to 0 to deactivate this feature.
  */
 #ifndef CONFIG_GCOAP_DTLS_MINIMUM_AVAILABLE_SESSIONS
@@ -434,7 +434,7 @@ extern "C" {
 #endif
 
 /**
- * @brief   Timeout for freeing up a session when minimum number of free
+ * @brief   Timeout for freeing up a session when minimum number of available
  *          sessions is not given.
  */
 #ifndef CONFIG_GCOAP_DTLS_MINIMUM_AVAILABLE_SESSIONS_TIMEOUT_USEC
