@@ -84,14 +84,14 @@ dsm_state_t dsm_store(sock_dtls_t *sock, sock_dtls_session_t *session,
 void dsm_remove(sock_dtls_t *sock, sock_dtls_session_t *session);
 
 /**
- * @brief   Returns the maximum number of available sessions slots
+ * @brief   Returns the maximum number of sessions slots
  *
- * @return  Number of maximum available sessio slots.
+ * @return  Number of session slots.
  */
 uint8_t dsm_get_num_maximum_slots(void);
 
 /**
- * @brief   Returns the number of currently available session slots
+ * @brief   Returns the number of available session slots
  *
  * @return  Number of available session slots in the session management.
  */
@@ -101,7 +101,7 @@ uint8_t dsm_get_num_available_slots(void);
  * @brief   Returns the oldest used session
  *
  * @param[in]   sock        @ref sock_dtls_t, which the session is created on
- * @param[in]   session     Empty session
+ * @param[out]  session     Oldest used session
  *
  * @return   1, on success
  * @return   -1, when no session is stored
