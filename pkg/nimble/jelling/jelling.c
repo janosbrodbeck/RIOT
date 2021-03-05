@@ -35,6 +35,9 @@
 #define PACKET_PKG_NUM_OFFSET   (10)
 #define PACKET_DATA_OFFSET      (11)
 
+#define ENABLE_DEBUG 0
+#include "debug.h"
+
 typedef enum {
     ADDR_MULTICAST = 1,
     ADDR_UNICAST
@@ -85,20 +88,6 @@ int jelling_send(gnrc_pktsnip_t* pkt) {
         return 0;
     }
 
-    /* if configured: don't send ICMP messages */
-    if (_config.advertiser_block_icmp) {
-        gnrc_pktsnip_t *tmp = pkt;
-        while (tmp) {
-            if (tmp-> type == GNRC_NETTYPE_ICMPV6) {
-                if (_config.advertiser_verbose) {
-                    printf("Skipped ICMP packet\n");
-                }
-                return 0;
-            }
-            tmp = tmp->next;
-        }
-    }
-
     uint8_t instance = -1;
 
     /* find free advertising instace */
@@ -138,7 +127,7 @@ int jelling_send(gnrc_pktsnip_t* pkt) {
     _pkt_next_num++;
 
     if (res < 0) {
-        printf("jelling_send: fragmentation failed. Return code: %02X\n", res);
+        DEBUG("jelling_send: fragmentation failed. Return code: %02X\n", res);
         goto exit;
     }
 
@@ -279,23 +268,6 @@ static void _on_data(struct ble_gap_event *event, void *arg)
         return;
     }
 
-    /* if we have sth in our filter list */
-    if (!_config.scanner_filter_empty) {
-        bool match = false;
-        for (int i = 0; i < JELLING_SCANNER_FILTER_SIZE; i++) {
-            if (!_config.scanner_filter[i].empty) {
-                if (memcmp(_config.scanner_filter[i].addr,
-                        event->ext_disc.addr.val, 6) == 0) {
-                    match = true;
-                    break;
-                }
-            }
-        }
-        if (!match) {
-            return;
-        }
-    }
-
     if (!_chain.ongoing) {
         bool jelling_packet = _filter_manufacturer_id((uint8_t *)event->ext_disc.data,
                             event->ext_disc.length_data);
@@ -354,7 +326,7 @@ static void _on_data(struct ble_gap_event *event, void *arg)
     } else { /* subsequent packet without jelling header */
         /* sanity check */
         if (_chain.len+event->ext_disc.length_data > sizeof(_chain.data)) {
-            printf("Broken packets from nimBLE\n");
+            DEBUG("Broken packets from nimBLE\n");
             _chain.ongoing = false;
             return;
         }
@@ -618,48 +590,10 @@ void jelling_print_info(void)
     }
 }
 
-int jelling_filter_add(char *addr)
-{
-    int pos = -1;
-    /* find empty space in filter list */
-    for (int i = 0; i < JELLING_SCANNER_FILTER_SIZE; i++) {
-        if (_config.scanner_filter[i].empty) {
-            pos = i;
-            break;
-        }
-    }
-    if (pos == -1) {
-        return -1;
-    }
-
-    if (bluetil_addr_from_str(_config.scanner_filter[pos].addr, addr) == NULL) {
-        return -1;
-    }
-
-    /* swap address (ask hauke why our addr is represented swapped) */
-    uint8_t tmp[BLE_ADDR_LEN];
-    bluetil_addr_swapped_cp(_config.scanner_filter[pos].addr, tmp);
-    memcpy(_config.scanner_filter[pos].addr, tmp, BLE_ADDR_LEN);
-
-    _config.scanner_filter_empty = false;
-    _config.scanner_filter[pos].empty = false;
-    return 0;
-}
-
-void jelling_filter_clear(void)
-{
-    memcpy(_config.scanner_filter, 0, sizeof(_config.scanner_filter));
-    for (int i=0; i < JELLING_SCANNER_FILTER_SIZE; i++) {
-        _config.scanner_filter[i].empty = true;
-    }
-    _config.scanner_filter_empty = true;
-}
-
 void jelling_load_default_config(void)
 {
     _config.advertiser_enable = JELLING_ADVERTISING_ENABLE_DFLT;
     _config.advertiser_verbose = JELLING_ADVERTISING_VERBOSE_DFLT;
-    _config.advertiser_block_icmp = JELLING_ADVERTISING_BLOCK_ICMP_DFLT;
     _config.advertiser_duration = JELLING_ADVERTISING_DURATION_DFLT;
     _config.advertiser_max_events = JELLING_ADVERTISING_MAX_EVENTS_DFLT;
     _config.advertiser_itvl_min = JELLING_ADVERTISING_ITVL_MIN_DFLT;
@@ -673,11 +607,6 @@ void jelling_load_default_config(void)
     _config.scanner_duration = JELLING_SCANNER_DURATION_DFLT;
     _config.scanner_filter_duplicates = JELLING_SCANNER_FILTER_DUPLICATES_DFLT;
 
-    memcpy(_config.scanner_filter, 0, sizeof(_config.scanner_filter));
-    for (int i=0; i < JELLING_SCANNER_FILTER_SIZE; i++) {
-        _config.scanner_filter[i].empty = true;
-    }
-    _config.scanner_filter_empty = true;
     if (IS_ACTIVE(JELLING_DUPLICATE_DETECTION_FEATURE_ENABLE)) {
         _config.duplicate_detection_enable = JELLING_DUPLICATE_DETECTION_ACTIVATION_DFTL;
     }
@@ -719,9 +648,6 @@ void jelling_print_config(void) {
     if (_config.advertiser_verbose) {
         printf("    Verbose: true\n");
     } else { printf("    Verbose: false\n"); }
-    if (_config.advertiser_block_icmp) {
-        printf("    ICMP packets blocked: true\n");
-    } else { printf("    ICMP packets blocked: false\n"); }
     printf("    Max events: %d \n", _config.advertiser_max_events);
     printf("    Duration: %d (Unit: 10ms)\n", _config.advertiser_duration);
     printf("    Itvl min: %ld (Unit: 0.625ms)\n", _config.advertiser_itvl_min);
@@ -743,18 +669,4 @@ void jelling_print_config(void) {
     printf("    Period: %d (Unit 1.28s)\n", _config.scanner_period);
     printf("    Itvl: %ld (Unit 0.625ms)\n", _config.scanner_itvl);
     printf("    Window: %ld (Unit 0.625ms)\n", _config.scanner_window);
-
-    bool empty = true;
-    printf("    Filter: ");
-    for (int i=0; i < JELLING_SCANNER_FILTER_SIZE; i++) {
-        if (!_config.scanner_filter[i].empty) {
-            printf("\n");
-            printf("        Node: ");
-            bluetil_addr_print(_config.scanner_filter[i].addr);
-            empty = false;
-        }
-    }
-    if (empty) {
-        printf("no address in filter\n");
-    } else { puts(""); }
 }

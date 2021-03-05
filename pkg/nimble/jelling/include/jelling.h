@@ -72,10 +72,6 @@
 #define JELLING_SCANNER_PERIOD_DFLT                     0
 #endif
 
-#ifndef JELLING_SCANNER_FILTER_SIZE
-#define JELLING_SCANNER_FILTER_SIZE                     3
-#endif
-
 #ifndef JELLING_SCANNER_FILTER_DUPLICATES_DFLT
 #define JELLING_SCANNER_FILTER_DUPLICATES_DFLT          1
 #endif
@@ -122,14 +118,8 @@ typedef enum {
 } jelling_status_t;
 
 typedef struct {
-    uint8_t addr[BLE_ADDR_LEN];
-    bool empty;
-} filter_entry_t;
-
-typedef struct {
     bool advertiser_enable;
     bool advertiser_verbose;
-    bool advertiser_block_icmp;
     /* Unit: 10ms */
     uint16_t advertiser_duration;
     uint16_t advertiser_max_events;
@@ -140,7 +130,6 @@ typedef struct {
 
     bool scanner_enable;
     bool scanner_verbose;
-    bool scanner_filter_empty;
     /* Unit: 0.625ms */
     uint32_t scanner_itvl;
     /* Unit: 0.625ms */
@@ -152,7 +141,6 @@ typedef struct {
     bool scanner_filter_duplicates;
     bool scanner_limited;
 
-    filter_entry_t scanner_filter[JELLING_SCANNER_FILTER_SIZE];
     bool duplicate_detection_enable;
 } jelling_config_t;
 
@@ -166,8 +154,6 @@ int jelling_send(gnrc_pktsnip_t *pkt);
 
 void jelling_load_default_config(void);
 jelling_config_t* jelling_get_config(void);
-int jelling_filter_add(char *addr);
-void jelling_filter_clear(void);
 
 void jelling_print_config(void);
 void jelling_print_info(void);

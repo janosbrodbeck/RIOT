@@ -51,11 +51,11 @@ int _nimble_jelling_handler(int argc, char **argv)
     if (memcmp(argv[1], "config", 6) == 0) {
         if (argc == 2) {
             if (IS_ACTIVE(JELLING_DUPLICATE_DETECTION_FEATURE_ENABLE)) {
-                printf("config usage: [info|default|icmp|dd|filter {ADDR}/clear|"
+                printf("config usage: [info|default|dd|"
                 "scanner blank/verbose/itvl/period/duration|"
                 "advertiser blank/verbose/duration/max_events/itvl_min/itvl_max]\n");
             } else {
-                printf("config usage: [info|default|icmp|filter {ADDR}/clear|"
+                printf("config usage: [info|default|"
                 "scanner blank/verbose/itvl/period/duration|"
                 "advertiser blank/verbose/duration/max_events/itvl_min/itvl_max]\n");
             }
@@ -83,15 +83,6 @@ int _nimble_jelling_handler(int argc, char **argv)
                 } else { printf("Config: set duplicate detection disabled\n"); }
                 return 0;
             }
-        }
-
-        /* toggle icmp */
-        if (memcmp(argv[2], "icmp", 4) == 0) {
-            config->advertiser_block_icmp = !config->advertiser_block_icmp;
-            if (config->advertiser_block_icmp) {
-                printf("Config: set ICMP packets blocked\n");
-            } else { printf("Config: set ICMP packets not blocked\n"); }
-            return 0;
         }
 
         bool none = true;
@@ -196,27 +187,9 @@ int _nimble_jelling_handler(int argc, char **argv)
             }
             return 0;
         }
-
-        if (argc == 4) {
-            if (memcmp(argv[2], "filter", 6) == 0) {
-                if (memcmp(argv[3], "clear", 5) == 0) {
-                    jelling_filter_clear();
-                    printf("Config: filter list cleared\n");
-                    return 0;
-                }
-                /* add new address */
-                if (jelling_filter_add(argv[3]) == 0) {
-                    printf("Config: new address filter applied\n");
-                } else {
-                    printf("Config: could not apply address filter\n");
-                }
-                return 0;
-            }
-        }
-
         /* else */
         printf("config usage: [info|scanner blank/verbose|advertiser blank/verbose|"
-            "icmp|filter {}|default]\n");
+            "default]\n");
     }
 
     if (memcmp(argv[1], "scanner", 7) == 0) {
