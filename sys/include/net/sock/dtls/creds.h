@@ -37,6 +37,13 @@ extern "C" {
 #ifndef CONFIG_DTLS_PSK_ID_HINT_MAX_SIZE
 #define CONFIG_DTLS_PSK_ID_HINT_MAX_SIZE    32
 #endif
+
+/**
+ * @brief   Default buffer size for TLS credential tags
+ */
+#ifndef CONFIG_DTLS_CREDENTIALS_MAX
+#define CONFIG_DTLS_CREDENTIALS_MAX     4
+#endif
 /** @} */
 
 /**
@@ -51,6 +58,32 @@ extern "C" {
  * @return -1 on error
  */
 int sock_dtls_set_psk_identity_hint(sock_dtls_t *sock, const char *hint);
+
+/**
+ * @brief Adds a credential tag to list of available credentials for @p sock.
+ *
+ * @pre sock != NULL
+ *
+ * @param[in] sock      DTLS sock object
+ * @param[in] tag       Tag of the credential to add
+ *
+ * @return 0 on success
+ * @return -1 otherwise
+ */
+int sock_dtls_add_credential(sock_dtls_t *sock, credman_tag_t tag);
+
+/**
+ * @brief Removes a credential tag of the list of available credentials for @p sock.
+ *
+ * @pre sock != NULL
+ *
+ * @param[in] sock      DTLS sock object
+ * @param[in] tag       Tag of the credential to remove
+ *
+ * @return 0 on success
+ * @return -1 otherwise
+ */
+int sock_dtls_remove_credential(sock_dtls_t *sock, credman_tag_t tag);
 
 #ifdef __cplusplus
 }
