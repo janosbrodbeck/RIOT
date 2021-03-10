@@ -30,15 +30,26 @@
  * - Server operation
  *   1. Create UDP sock @ref sock_udp_create()
  *   2. Create DTLS sock @ref sock_dtls_create() using role
- *      @ref SOCK_DTLS_SERVER
- *   3. Start listening with @ref sock_dtls_recv()
+ *      @ref SOCK_DTLS_SERVER.
+ *   3. Optionally:
+ *          - when using PSK ciphersuites, set a hint @ref sock_dtls_set_psk_identity_hint()
+ *          - add extra credentials @ref sock_dtls_add_credential()
+ *          - when using ECC ciphersuites, set a callback for credential selection
+ *            @ref sock_dtls_set_rpk_cb()
+ *   4. Start listening with @ref sock_dtls_recv()
  * - Client operation
  *   1. Create UDP sock @ref sock_udp_create()
  *   2. Create DTLS sock @ref sock_dtls_create() using role
  *      @ref SOCK_DTLS_CLIENT
- *   3. Start handshake session to server @ref sock_dtls_session_init()
- *   4. Handle incoming handshake packets with @ref sock_dtls_recv()
- *   5. Send packet to server @ref sock_dtls_send()
+ *   3. Optionally:
+ *          - add extra credentials @ref sock_dtls_add_credential()
+ *          - when using PSK ciphersuites, set a callback for hint reception and credential
+ *            selection @ref sock_dtls_set_client_psk_cb()
+ *          - when using ECC ciphersuites, set a callback for credential selection
+ *            @ref sock_dtls_set_rpk_cb()
+ *   4. Start handshake session to server @ref sock_dtls_session_init()
+ *   5. Handle incoming handshake packets with @ref sock_dtls_recv()
+ *   6. Send packet to server @ref sock_dtls_send()
  *
  * ## Makefile Includes
  *
@@ -156,10 +167,10 @@
  * [type](@ref credman_credential_t::type).
  *
  * Next, we must assign a [tag](@ref credman_tag_t) for the credential. Tags
- * are unsigned integer value that is used to identify which DTLS sock has
- * access to which credential. Each DTLS sock will also be assigned a tag.
+ * are unsigned integer values used to identify which DTLS sock has
+ * access to which credentials. Each DTLS sock will also be assigned a list of tags.
  * As a result, a sock can only use credentials that have the same tag as
- * its assigned tag.
+ * the ones in the list.
  *
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ {.c}
  * if (credman_add(&psk_credential) < 0) {
@@ -467,6 +478,27 @@
  * sock_udp_close(&udp_sock);
  * return 0;
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ *
+ * ### Multi-credential handling
+ *
+ * Each sock needs at least one credential tag. Extra credentials can be added
+ * and removed using @ref sock_dtls_add_credential and @ref sock_dtls_remove_credential
+ * respectively (found in `net/sock/dtls/creds.h`).
+ *
+ * #### Pre-shared Keys Cipher Suites
+ * In the case of PSK, a server can optionally indicate a hint to help the server to decide which
+ * PSK Identity to use, using @ref sock_dtls_set_psk_identity_hint. The client application can
+ * decide which credential to use based on the sent hint and/or the session information, by
+ * registering a callback with @ref sock_dtls_set_client_psk_cb.
+ *
+ * #### Elliptic Curve Cryptography Cipher Suites
+ * When using ECC both client and server applications can register a callback to decide which of
+ * the registered credentials should be used, based on the session information. This is done using
+ * @ref sock_dtls_set_rpk_cb.
+ *
+ * In both cases, if no callbacks are registered, the sock implementation will try to find a
+ * registered credential in the Sock's credential list, that matches the needed type. The first
+ * one that matches is used.
  *
  * @{
  *
