@@ -162,23 +162,15 @@ static int _get_psk_info(struct dtls_context_t *ctx, const session_t *session,
                          const unsigned char *desc, size_t desc_len,
                          unsigned char *result, size_t result_length)
 {
-    (void)ctx;
-    (void)desc;
-    (void)desc_len;
-    (void)session;
-    int ret;
-
-    sock_dtls_t *sock = dtls_get_app_data(ctx);
-
     credman_credential_t credential;
-    ret = credman_get(&credential, sock->tag, CREDMAN_TYPE_PSK);
-    if (ret < 0) {
-        DEBUG("sock_dtls: no matching PSK credential found\n");
-        return dtls_alert_fatal_create(DTLS_ALERT_DECRYPT_ERROR);
-    }
+    sock_udp_ep_t ep;
+    sock_dtls_t *sock = dtls_get_app_data(ctx);
 
     const void *c = NULL;
     size_t c_len = 0;
+
+    _session_to_ep(session, &ep);
+
     switch (type) {
     case DTLS_PSK_HINT:
         DEBUG("sock_dtls: psk hint request\n");
@@ -194,13 +186,56 @@ static int _get_psk_info(struct dtls_context_t *ctx, const session_t *session,
         }
     case DTLS_PSK_IDENTITY:
         DEBUG("sock_dtls: psk id request\n");
-        c = credential.params.psk.id.s;
-        c_len = credential.params.psk.id.len;
+        /* if the application set a callback , try to select credential from there */
+        if (sock->client_psk_cb) {
+            DEBUG("sock_dtls: requesting the application\n");
+            credential.tag = sock->client_psk_cb(sock, &ep, sock->tags, sock->tags_len,
+                                                 (const char*)desc, desc_len);
+            if (credential.tag != CREDMAN_TAG_EMPTY) {
+                int ret = credman_get(&credential, credential.tag, CREDMAN_TYPE_PSK);
+                if (ret == CREDMAN_OK) {
+                    c = credential.params.psk.id.s;
+                    c_len = credential.params.psk.id.len;
+                    break;
+                }
+            }
+        }
+
+        /* if no callback set or no valid credential returned, try to find a valid registered one */
+        DEBUG("sock_dtls: trying to get first PSK credential\n");
+        for (unsigned i = 0; i < sock->tags_len; i++) {
+            if (credman_get(&credential, sock->tags[i], CREDMAN_TYPE_PSK) == CREDMAN_OK) {
+                c = credential.params.psk.id.s;
+                c_len = credential.params.psk.id.len;
+                break;
+            }
+        }
+
+        /* return alert if could not determine which identity to use */
+        if (!c) {
+            return dtls_alert_fatal_create(DTLS_ALERT_INTERNAL_ERROR);
+        }
         break;
     case DTLS_PSK_KEY:
         DEBUG("sock_dtls: psk key request\n");
-        c = credential.params.psk.key.s;
-        c_len = credential.params.psk.key.len;
+
+        if (desc) {
+            DEBUG("sock_dtls: looking key for ID: %.*s\n", desc_len, desc);
+            /* try to find matching ID among the registered credentials */
+            for (unsigned i = 0; i < sock->tags_len; i++) {
+                if (credman_get(&credential, sock->tags[i], CREDMAN_TYPE_PSK) == CREDMAN_OK) {
+                    DEBUG("sock_dtls: comparing to tag %d, with ID: %.*s\n", sock->tags[i],
+                          credential.params.psk.id.len, (char *)credential.params.psk.id.s);
+                    if (desc_len == credential.params.psk.id.len &&
+                        !memcmp(desc, credential.params.psk.id.s, desc_len)) {
+                        DEBUG("sock_dtls: found\n");
+                        c = credential.params.psk.key.s;
+                        c_len = credential.params.psk.key.len;
+                        break;
+                    }
+                }
+            }
+        }
         break;
     default:
         DEBUG("sock:dtls unsupported request type: %d\n", type);
