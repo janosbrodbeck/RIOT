@@ -75,6 +75,14 @@ static dtls_handler_t _dtls_handler = {
 #endif /* CONFIG_DTLS_ECC */
 };
 
+#ifdef CONFIG_DTLS_ECC
+/**
+ * @brief Array of ECDSA keys to convert from credman credentials and send in
+ *        the callback.
+ */
+static dtls_ecdsa_key_t _ecdsa_keys[CONFIG_DTLS_CREDENTIALS_MAX];
+#endif
+
 static int _read(struct dtls_context_t *ctx, session_t *session, uint8_t *buf,
                  size_t len)
 {
@@ -262,20 +270,58 @@ static int _get_ecdsa_key(struct dtls_context_t *ctx, const session_t *session,
     (void)session;
     int ret;
     sock_dtls_t *sock = (sock_dtls_t *)dtls_get_app_data(ctx);
+    sock_udp_ep_t ep;
+
+    _session_to_ep(session, &ep);
 
     credman_credential_t credential;
-    ret = credman_get(&credential, sock->tag, CREDMAN_TYPE_ECDSA);
-    if (ret < 0) {
-            DEBUG("sock_dtls: no matching ecdsa credential found\n");
-            return dtls_alert_fatal_create(DTLS_ALERT_INTERNAL_ERROR);
+    credential.tag = CREDMAN_TAG_EMPTY;
+    DEBUG("sock_dtls: get ECDSA key\n");
+
+    /* if the application set a callback , try to select credential from there */
+    if (sock->rpk_cb) {
+        DEBUG("sock_dtls: requesting the application\n");
+        credential.tag = sock->rpk_cb(sock, &ep, sock->tags, sock->tags_len);
+        if (credential.tag != CREDMAN_TAG_EMPTY) {
+            ret = credman_get(&credential, credential.tag, CREDMAN_TYPE_ECDSA);
+            if (ret != CREDMAN_OK) {
+                credential.tag = CREDMAN_TAG_EMPTY;
+            }
+        }
     }
 
-    static dtls_ecdsa_key_t key;
-    key.curve = DTLS_ECDH_CURVE_SECP256R1;
-    key.priv_key = credential.params.ecdsa.private_key;
-    key.pub_key_x = credential.params.ecdsa.public_key.x;
-    key.pub_key_y = credential.params.ecdsa.public_key.y;
-    *result = &key;
+    if (credential.tag == CREDMAN_TYPE_EMPTY) {
+        /* if could not get credential try to fetch the first valid credential */
+        for (unsigned i = 0; i < sock->tags_len; i++) {
+            ret = credman_get(&credential, sock->tags[i], CREDMAN_TYPE_ECDSA);
+            if (ret == CREDMAN_OK) {
+                break;
+            }
+        }
+
+        if (ret != CREDMAN_OK) {
+            DEBUG("sock_dtls: no valid credential registered\n");
+            return dtls_alert_fatal_create(DTLS_ALERT_INTERNAL_ERROR);
+        }
+    }
+
+    dtls_ecdsa_key_t *key = NULL;
+    for (unsigned i = 0; i < CONFIG_DTLS_CREDENTIALS_MAX; i++) {
+        if (!_ecdsa_keys[i].priv_key) {
+            key = &_ecdsa_keys[i];
+        }
+    }
+    if (!key) {
+        DEBUG("sock_dtls: ECDSA keys is full\n");
+        return dtls_alert_fatal_create(DTLS_ALERT_INTERNAL_ERROR);
+    }
+
+    key->curve = DTLS_ECDH_CURVE_SECP256R1;
+    key->priv_key = credential.params.ecdsa.private_key;
+    key->pub_key_x = credential.params.ecdsa.public_key.x;
+    key->pub_key_y = credential.params.ecdsa.public_key.y;
+
+    *result = key;
     return 0;
 }
 
