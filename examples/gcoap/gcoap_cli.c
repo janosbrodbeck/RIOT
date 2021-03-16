@@ -37,6 +37,8 @@
 
 static const uint8_t psk_id_0[] = PSK_DEFAULT_IDENTITY;
 static const uint8_t psk_key_0[] = PSK_DEFAULT_KEY;
+static const char psk_id_0_hint[] = PSK_DEFAULT_HINT;
+
 static const credman_credential_t credential = {
     .type = CREDMAN_TYPE_PSK,
     .tag = CONFIG_GCOAP_DTLS_CREDENTIAL_TAG,
@@ -319,6 +321,26 @@ static size_t _send(uint8_t *buf, size_t len, char *addr_str, char *port_str)
     return bytes_sent;
 }
 
+#if IS_ACTIVE(CONFIG_GCOAP_ENABLE_DTLS)
+static credman_tag_t _client_psk_cb(sock_dtls_t *sock, sock_udp_ep_t *ep, credman_tag_t tags[],
+                                    unsigned tags_len, const char *hint, size_t hint_len)
+{
+    (void) sock;
+    (void) tags;
+    (void) tags_len;
+    (void) ep;
+
+    if (hint && hint_len) {
+        printf("Client got hint: %.*s\n", hint_len, hint);
+        size_t len = strlen(psk_id_0_hint);
+        if (hint_len == len && !strncmp(psk_id_0_hint, hint, len)) {
+            return CONFIG_GCOAP_DTLS_CREDENTIAL_TAG;
+        }
+    }
+    return CONFIG_GCOAP_DTLS_CREDENTIAL_TAG;
+}
+#endif
+
 int gcoap_cli_cmd(int argc, char **argv)
 {
     /* Ordered like the RFC method code numbers, but off by 1. GET is code 0. */
@@ -497,6 +519,8 @@ void gcoap_cli_init(void)
             printf("Error cannot add credential to system: %d\n", (int)res);
             return;
         }
+        gcoap_set_client_psk_cb(_client_psk_cb) ;
+        gcoap_set_server_psk_identity_hint(psk_id_0_hint);
 #endif
 
     gcoap_register_listener(&_listener);

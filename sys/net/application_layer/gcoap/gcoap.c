@@ -1009,6 +1009,28 @@ void gcoap_register_listener(gcoap_listener_t *listener)
     }
 }
 
+#if IS_ACTIVE(CONFIG_GCOAP_ENABLE_DTLS)
+int gcoap_add_credential(credman_tag_t tag)
+{
+    return sock_dtls_add_credential(&_sock_dtls, tag);
+}
+
+void gcoap_set_client_psk_cb(sock_dtls_client_psk_cb_t cb)
+{
+    sock_dtls_set_client_psk_cb(&_sock_dtls, cb);
+}
+
+void gcoap_set_rpk_cb(sock_dtls_rpk_cb_t cb)
+{
+    sock_dtls_set_rpk_cb(&_sock_dtls, cb);
+}
+
+int gcoap_set_server_psk_identity_hint(const char *hint)
+{
+    return sock_dtls_set_psk_identity_hint(&_sock_dtls, hint);
+}
+#endif
+
 int gcoap_req_init(coap_pkt_t *pdu, uint8_t *buf, size_t len,
                    unsigned code, const char *path)
 {

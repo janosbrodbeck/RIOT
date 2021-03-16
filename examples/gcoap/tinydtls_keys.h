@@ -30,6 +30,7 @@ extern "C" {
  */
 #define PSK_DEFAULT_IDENTITY "Client_identity"
 #define PSK_DEFAULT_KEY "secretPSK"
+#define PSK_DEFAULT_HINT "hint"
 #define PSK_OPTIONS "i:k:"
 #define PSK_ID_MAXLEN 32
 #define PSK_MAXLEN 32

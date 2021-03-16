@@ -386,6 +386,7 @@
 #include "net/sock/udp.h"
 #if IS_ACTIVE(CONFIG_GCOAP_ENABLE_DTLS)
 #include "net/sock/dtls.h"
+#include "net/credman.h"
 #endif
 #include "net/nanocoap.h"
 #include "xtimer.h"
@@ -814,6 +815,21 @@ kernel_pid_t gcoap_init(void);
  * @param[in] listener  Listener containing the resources.
  */
 void gcoap_register_listener(gcoap_listener_t *listener);
+
+#if IS_ACTIVE(CONFIG_GCOAP_ENABLE_DTLS)
+/**
+ * @brief Adds a credential tag to list of available credentials for gcoap.
+ *
+ * @param[in] tag       Tag of the credential to add
+ *
+ * @return 0 on success
+ * @return -1 otherwise
+ */
+int gcoap_add_credential(credman_tag_t tag);
+int gcoap_set_server_psk_identity_hint(const char *hint);
+void gcoap_set_client_psk_cb(sock_dtls_client_psk_cb_t cb);
+void gcoap_set_rpk_cb(sock_dtls_rpk_cb_t cb);
+#endif
 
 /**
  * @brief   Initializes a CoAP request PDU on a buffer.
