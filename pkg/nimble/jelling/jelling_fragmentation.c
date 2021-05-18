@@ -81,9 +81,9 @@ size_t _write_hdr(uint8_t *data, uint8_t *next_hop, uint8_t pkt_num, bool write_
     if (write_next_hop) {
         memcpy(data+len, next_hop, BLE_ADDR_LEN);
         len += BLE_ADDR_LEN;
+        memset(data+len, pkt_num, 1);
+        len++;
     }
-    memset(data+len, pkt_num, 1);
-    len++;
     return len;
 }
 

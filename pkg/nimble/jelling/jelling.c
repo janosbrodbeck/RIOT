@@ -27,6 +27,10 @@
 #include "host/ble_hs_adv.h"
 #include "host/util/util.h"
 
+#ifdef MODULE_DATARATE
+#include "datarate.h"
+#endif
+
 #define ADV_INSTANCES           (MYNEWT_VAL_BLE_MULTI_ADV_INSTANCES+1)
 
 /* offset between data type (manufacturer specific data) and
@@ -124,6 +128,7 @@ int jelling_send(gnrc_pktsnip_t* pkt) {
         uint8_t *dst_addr = gnrc_netif_hdr_get_dst_addr(hdr);
         res = jelling_fragment_into_mbuf(pkt->next, buf, dst_addr, _pkt_next_num);
     }
+
     _pkt_next_num++;
 
     if (res < 0) {
@@ -134,9 +139,14 @@ int jelling_send(gnrc_pktsnip_t* pkt) {
     if(IS_ACTIVE(JELLING_DEBUG_IPV6_PACKET_SIZES)) {
         printf("Sending IPv6 packet of %d bytes\n", gnrc_pkt_len(pkt)-pkt->size);
     }
-
+    uint32_t sent = OS_MBUF_PKTLEN(buf);
     /* note: ble_gap_ext_adv_set_data already calls os_mbuf_free_chain! */
     res = _send_pkt(instance, buf);
+    if (res == 0) {
+#ifdef MODULE_DATARATE
+        datarate_send_add(sent);
+#endif
+    }
     return res;
 
 exit:
@@ -236,7 +246,7 @@ static size_t _prepare_ipv6_packet(uint8_t *data, size_t len)
             first = false;
         } else {
             memcpy(data+pos_ipv6, data+pos+PACKET_NEXT_HOP_OFFSET+1, len_data_type-PACKET_NEXT_HOP_OFFSET);
-            pos_ipv6 += len_data_type-PACKET_NEXT_HOP_OFFSET;
+            pos_ipv6 += len_data_type-PACKET_NEXT_HOP_OFFSET+1;
         }
         pos += 1 + len_data_type; /* len field is not included in len_data_type */
     }
@@ -344,6 +354,7 @@ static void _on_data(struct ble_gap_event *event, void *arg)
         return;
     }
 
+    uint32_t received_bytes = _chain.len;
     /* Process BLE data */
     size_t ipv6_packet_size = _prepare_ipv6_packet(_chain.data, _chain.len);
     if (ipv6_packet_size == -1) {
@@ -390,6 +401,9 @@ static void _on_data(struct ble_gap_event *event, void *arg)
     /* copy payload from event into pktbuffer */
     memcpy(payload->data, _chain.data, ipv6_packet_size);
 
+#ifdef MODULE_DATARATE
+    datarate_recv_add(received_bytes);
+#endif
     /* finally dispatch the receive packet to gnrc */
     if (!gnrc_netapi_dispatch_receive(payload->type, GNRC_NETREG_DEMUX_CTX_ALL,
                                     payload)) {
