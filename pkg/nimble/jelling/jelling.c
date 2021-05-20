@@ -245,7 +245,7 @@ static size_t _prepare_ipv6_packet(uint8_t *data, size_t len)
             pos_ipv6 += len_data_type-PACKET_DATA_OFFSET+1;
             first = false;
         } else {
-            memcpy(data+pos_ipv6, data+pos+PACKET_NEXT_HOP_OFFSET+1, len_data_type-PACKET_NEXT_HOP_OFFSET);
+            memcpy(data+pos_ipv6, data+pos+PACKET_NEXT_HOP_OFFSET, len_data_type-PACKET_NEXT_HOP_OFFSET+1);
             pos_ipv6 += len_data_type-PACKET_NEXT_HOP_OFFSET+1;
         }
         pos += 1 + len_data_type; /* len field is not included in len_data_type */
