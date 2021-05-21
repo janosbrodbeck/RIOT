@@ -40,14 +40,10 @@ static mutex_t _lock;
 static dsm_session_t _sessions[DTLS_PEER_MAX];
 static uint8_t _available_slots;
 
-void dsm_init(void) {
+void dsm_init(void)
+{
     mutex_init(&_lock);
     _available_slots = DTLS_PEER_MAX;
-
-    for (uint8_t i=0; i < DTLS_PEER_MAX; i++) {
-        _sessions[i].state = SESSION_STATE_NONE;
-        memset(&_sessions[i], 0, sizeof(dsm_session_t));
-    }
 }
 
 dsm_state_t dsm_store(sock_dtls_t *sock, sock_dtls_session_t *session,
@@ -146,7 +142,8 @@ ssize_t dsm_get_oldest_used_session(sock_dtls_t *sock, sock_dtls_session_t *sess
  * Returns 0, if empty slot found
  * Returns -1, if no existing or empty session found */
 static int _find_session(sock_dtls_t *sock, sock_dtls_session_t *to_find,
-                         dsm_session_t **session) {
+                         dsm_session_t **session)
+{
 
     /* FIXME: optimize search / data structure */
     sock_udp_ep_t to_find_ep, curr_ep;
