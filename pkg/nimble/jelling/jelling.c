@@ -126,6 +126,12 @@ int jelling_send(gnrc_pktsnip_t* pkt) {
         res = jelling_fragment_into_mbuf(pkt->next, buf, _ble_mc_addr, _pkt_next_num);
     } else { /* unicast */
         uint8_t *dst_addr = gnrc_netif_hdr_get_dst_addr(hdr);
+#if IS_ACTIVE(JELLING_PRINT_ROUTING)
+        printf("Sending packet at destination address: ");
+        for (uint8_t i = 0; i < sizeof(BLE_ADDR_LEN); i++) {
+            printf("%02x:", dst_addr[i]);
+        }
+#endif
         res = jelling_fragment_into_mbuf(pkt->next, buf, dst_addr, _pkt_next_num);
     }
 
