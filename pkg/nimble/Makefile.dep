@@ -81,3 +81,23 @@ ifneq (,$(filter nimble_netif,$(USEMODULE)))
     USEMODULE += gnrc_sixlowpan_iphc
   endif
 endif
+
+ifneq (,$(filter nimble_jelling,$(USEMODULE)))
+  FEATURES_REQUIRED += ble_nimble_netif
+  USEMODULE += xtimer
+  USEMODULE += l2util
+  USEMODULE += bluetil_addr
+  ifneq (,$(filter gnrc_ipv6_%,$(USEMODULE)))
+    USEMODULE += nimble_svc_ipss
+  endif
+  ifneq (,$(filter gnrc_ipv6_router_default,$(USEMODULE)))
+    USEMODULE += gnrc_ipv6_nib_6lr
+    USEMODULE += gnrc_sixlowpan
+    USEMODULE += gnrc_sixlowpan_iphc
+  endif
+  ifneq (,$(filter gnrc_ipv6_default,$(USEMODULE)))
+    USEMODULE += gnrc_ipv6_nib_6ln
+    USEMODULE += gnrc_sixlowpan
+    USEMODULE += gnrc_sixlowpan_iphc
+  endif
+endif

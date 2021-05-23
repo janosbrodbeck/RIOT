@@ -110,6 +110,10 @@ ifneq (,$(filter nimble_netif,$(USEMODULE)))
   SRC += sc_nimble_netif.c
 endif
 
+ifneq (, $(filter nimble_jelling,$(USEMODULE)))
+  SRC += sc_nimble_jelling.c
+endif
+
 ifneq (,$(filter nimble_statconn,$(USEMODULE)))
   SRC += sc_nimble_statconn.c
 endif
