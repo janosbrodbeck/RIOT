@@ -31,6 +31,10 @@
 #include "datarate.h"
 #endif
 
+#ifdef MODULE_LLSTATS_JELLING
+#include "llstats.h"
+#endif
+
 #define ADV_INSTANCES           (MYNEWT_VAL_BLE_MULTI_ADV_INSTANCES+1)
 
 /* offset between data type (manufacturer specific data) and
@@ -343,6 +347,9 @@ static void _on_data(struct ble_gap_event *event, void *arg)
         /* sanity check */
         if (_chain.len+event->ext_disc.length_data > sizeof(_chain.data)) {
             DEBUG("Broken packets from nimBLE\n");
+#ifdef MODULE_LLSTATS_JELLING
+            llstats_jelling_broken_data();
+#endif
             _chain.ongoing = false;
             return;
         }
@@ -364,6 +371,9 @@ static void _on_data(struct ble_gap_event *event, void *arg)
     /* Process BLE data */
     size_t ipv6_packet_size = _prepare_ipv6_packet(_chain.data, _chain.len);
     if (ipv6_packet_size == -1) {
+#ifdef MODULE_LLSTATS_JELLING
+        llstats_jelling_broken_data();
+#endif
         if (IS_ACTIVE(JELLING_DEBUG_BROKEN_BLE_DATA_MSG)) {
             printf("Broken BLE data\n");
         }
