@@ -336,6 +336,9 @@ static void _on_data(struct ble_gap_event *event, void *arg)
         if (IS_ACTIVE(JELLING_DUPLICATE_DETECTION_FEATURE_ENABLE)) {
             if (_config.duplicate_detection_enable) {
                 if (jelling_dd_check_for_entry(event->ext_disc.addr.val, _chain.pkt_num)) {
+#ifdef MODULE_LLSTATS_JELLING
+                    llstats_inc_duplicate();
+#endif
                     return;
                 }
             }
