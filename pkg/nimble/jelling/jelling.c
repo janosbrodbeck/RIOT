@@ -294,9 +294,15 @@ static void _on_data(struct ble_gap_event *event, void *arg)
 
         /* do not process any further if unknown packet */
         if (!jelling_packet) {
+#ifdef MODULE_LLSTATS_JELLING
+            llstats_inc_unknown_packet();
+#endif
             return;
         }
     }
+#ifdef MODULE_LLSTATS_JELLING
+        llstats_inc_known_packet();
+#endif
 
     /* print info */
     if (_config.scanner_verbose) {
